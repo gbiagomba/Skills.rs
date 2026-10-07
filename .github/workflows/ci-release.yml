@@ -1,0 +1,374 @@
+# .github/workflows/ci-release.yml
+#
+# TEMPLATE INSTRUCTIONS FOR CODING AGENT:
+# 1. Set `PROJECT_TYPE` below to either "rust" or "python".
+# 2. If PROJECT_TYPE == "rust":
+#    - Replace `program_name` in BINARY_NAME with the final binary name (Cargo [[bin]] name).
+#    - Ensure Cargo.toml and src/main.rs are set up accordingly.
+# 3. If PROJECT_TYPE == "python":
+#    - Replace `program_name` in PYTHON_PACKAGE_NAME with the package/distribution name.
+#    - Ensure pyproject.toml / setup.cfg / setup.py matches that name.
+# 4. Set DOCKER_IMAGE_NAME to the Docker Hub repository name for this project.
+# 5. Ensure there is a CHANGELOG.md with headings like "## v1.0.0" or "## [1.0.0] - DATE".
+#    If no matching section is found,
+#    the workflow will fall back to the tag message for release notes.
+#
+# The `setup` job resolves PROJECT_TYPE into a job output. Every downstream job gates
+# on that output rather than on `env`, because the `env` context is NOT available in a
+# job-level `if:` expression. It also reports whether buildable source is present, so an
+# unfilled template scaffold reports success instead of failing on an empty project.
+
+name: CI and Release
+
+on:
+  push:
+    branches:
+      - '**'
+    tags:
+      - 'v*'
+  pull_request:
+    branches:
+      - '**'
+
+env:
+  PROJECT_TYPE: rust
+  BINARY_NAME: program_name
+  PYTHON_PACKAGE_NAME: program_name
+  DOCKER_IMAGE_NAME: program_name
+
+jobs:
+  setup:
+    name: Resolve project configuration
+    runs-on: ubuntu-latest
+    outputs:
+      project_type: ${{ steps.resolve.outputs.project_type }}
+      has_source: ${{ steps.resolve.outputs.has_source }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v7
+
+      - name: Resolve project type and source presence
+        id: resolve
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo "project_type=${PROJECT_TYPE}" >> "$GITHUB_OUTPUT"
+
+          has_source=false
+          case "${PROJECT_TYPE}" in
+            rust)
+              if [ -f Cargo.toml ] && [ -d src ]; then
+                has_source=true
+              fi
+              ;;
+            python)
+              if [ -f pyproject.toml ] || [ -f setup.py ] || [ -f setup.cfg ]; then
+                has_source=true
+              fi
+              ;;
+            *)
+              echo "::error::PROJECT_TYPE must be 'rust' or 'python', got '${PROJECT_TYPE}'"
+              exit 1
+              ;;
+          esac
+
+          echo "has_source=${has_source}" >> "$GITHUB_OUTPUT"
+          if [ "${has_source}" = "false" ]; then
+            echo "::notice::No ${PROJECT_TYPE} source detected. This is an unfilled template scaffold, so build, test, and release jobs are skipped."
+          fi
+
+  build-test:
+    name: Build and Test (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    needs: setup
+    if: needs.setup.outputs.has_source == 'true'
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-15-intel, macos-14, windows-latest]
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v7
+
+      # RUST TOOLCHAIN + CI PATH
+      - name: Set up Rust
+        if: needs.setup.outputs.project_type == 'rust'
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache cargo
+        if: needs.setup.outputs.project_type == 'rust'
+        uses: swatinem/rust-cache@v2
+
+      - name: Rust Format (cargo fmt)
+        if: needs.setup.outputs.project_type == 'rust'
+        run: cargo fmt --all -- --check
+
+      - name: Rust Lints (cargo clippy)
+        if: needs.setup.outputs.project_type == 'rust'
+        run: cargo clippy --all-targets -- -D warnings
+
+      - name: Rust Build (release)
+        if: needs.setup.outputs.project_type == 'rust'
+        run: cargo build --release
+
+      - name: Rust Tests
+        if: needs.setup.outputs.project_type == 'rust'
+        run: cargo test --all --no-fail-fast
+
+      - name: Upload Rust binary artifact
+        if: needs.setup.outputs.project_type == 'rust' && startsWith(github.ref, 'refs/tags/v')
+        uses: actions/upload-artifact@v7
+        with:
+          name: ${{ env.BINARY_NAME }}-${{ runner.os }}-${{ runner.arch }}
+          path: |
+            target/release/${{ env.BINARY_NAME }}*
+
+      # PYTHON TOOLCHAIN + CI PATH
+      - name: Set up Python
+        if: needs.setup.outputs.project_type == 'python'
+        uses: actions/setup-python@v7
+        with:
+          python-version: '3.x'
+          cache: 'pip'
+
+      - name: Install Python dependencies
+        if: needs.setup.outputs.project_type == 'python'
+        shell: bash
+        run: |
+          if [ -f "requirements-dev.txt" ]; then
+            pip install -r requirements-dev.txt
+          elif [ -f "requirements.txt" ]; then
+            pip install -r requirements.txt
+          fi
+
+      - name: Python Lint/Format (optional placeholder)
+        if: needs.setup.outputs.project_type == 'python'
+        shell: bash
+        run: |
+          echo "Add flake8/black/ruff/mypy here if desired"
+
+      - name: Python Tests
+        if: needs.setup.outputs.project_type == 'python'
+        shell: bash
+        run: |
+          if [ -d "tests" ]; then
+            pip install pytest
+            pytest
+          else
+            echo "No tests/ directory found; skipping pytest."
+          fi
+
+      - name: Build Python package
+        if: needs.setup.outputs.project_type == 'python' && startsWith(github.ref, 'refs/tags/v')
+        shell: bash
+        run: |
+          pip install build
+          python -m build
+
+      - name: Upload Python package artifacts
+        if: needs.setup.outputs.project_type == 'python' && startsWith(github.ref, 'refs/tags/v')
+        uses: actions/upload-artifact@v7
+        with:
+          name: ${{ env.PYTHON_PACKAGE_NAME }}-dist
+          path: dist/*
+
+  # RUST-ONLY CROSS BUILDS (aarch64)
+  linux-arm64:
+    name: Linux aarch64 (cross)
+    runs-on: ubuntu-latest
+    needs: setup
+    if: needs.setup.outputs.project_type == 'rust' && needs.setup.outputs.has_source == 'true' && startsWith(github.ref, 'refs/tags/v')
+    steps:
+      - uses: actions/checkout@v7
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-unknown-linux-gnu
+      - name: Install cross
+        run: cargo install cross --git https://github.com/cross-rs/cross
+      - name: Build (cross)
+        run: cross build --release --target aarch64-unknown-linux-gnu
+      - name: Upload binary (linux aarch64)
+        uses: actions/upload-artifact@v7
+        with:
+          name: ${{ env.BINARY_NAME }}-linux-aarch64
+          path: target/aarch64-unknown-linux-gnu/release/${{ env.BINARY_NAME }}*
+
+  macos-arm64:
+    name: macOS aarch64 (native)
+    runs-on: macos-latest
+    needs: setup
+    if: needs.setup.outputs.project_type == 'rust' && needs.setup.outputs.has_source == 'true' && startsWith(github.ref, 'refs/tags/v')
+    steps:
+      - uses: actions/checkout@v7
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-apple-darwin
+      - name: Build (macOS aarch64)
+        run: cargo build --release --target aarch64-apple-darwin
+      - name: Upload binary (macOS aarch64)
+        uses: actions/upload-artifact@v7
+        with:
+          name: ${{ env.BINARY_NAME }}-macos-aarch64
+          path: target/aarch64-apple-darwin/release/${{ env.BINARY_NAME }}*
+
+  windows-arm64:
+    name: Windows aarch64 (cross)
+    runs-on: windows-latest
+    needs: setup
+    if: needs.setup.outputs.project_type == 'rust' && needs.setup.outputs.has_source == 'true' && startsWith(github.ref, 'refs/tags/v')
+    steps:
+      - uses: actions/checkout@v7
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-pc-windows-msvc
+      - name: Build (windows aarch64)
+        run: cargo build --release --target aarch64-pc-windows-msvc
+      - name: Upload binary (windows aarch64)
+        uses: actions/upload-artifact@v7
+        with:
+          name: ${{ env.BINARY_NAME }}-windows-aarch64
+          path: target/aarch64-pc-windows-msvc/release/${{ env.BINARY_NAME }}.exe
+
+  release:
+    name: Release on tag
+    runs-on: ubuntu-latest
+    needs:
+      - setup
+      - build-test
+      - linux-arm64
+      - macos-arm64
+      - windows-arm64
+    # The aarch64 jobs are skipped for Python projects, and a skipped dependency would
+    # otherwise skip this job too. always() keeps it reachable; the result checks make
+    # sure a genuine failure still blocks the release.
+    if: >-
+      always() &&
+      startsWith(github.ref, 'refs/tags/v') &&
+      needs.setup.outputs.has_source == 'true' &&
+      needs.build-test.result == 'success' &&
+      !contains(needs.*.result, 'failure') &&
+      !contains(needs.*.result, 'cancelled')
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - name: Download artifacts (Rust + Python)
+        uses: actions/download-artifact@v8
+        with:
+          pattern: "*"
+          merge-multiple: true
+
+      - name: Create checksums (Rust binaries only)
+        if: needs.setup.outputs.project_type == 'rust'
+        shell: bash
+        run: |
+          for f in "${BINARY_NAME}"-*; do
+            if [ -f "$f" ]; then
+              sha256sum "$f" > "$f.sha256"
+            fi
+          done
+
+      - name: Extract release notes
+        id: extract_notes
+        shell: bash
+        run: |
+          VERSION="${GITHUB_REF#refs/tags/}"
+          NUMBER="${VERSION#v}"
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          : > release_notes.md
+          # Accepts both "## v1.0.0" and the Keep a Changelog form "## [1.0.0] - DATE".
+          if [ -f CHANGELOG.md ]; then
+            awk -v tag="$VERSION" -v num="$NUMBER" '
+              /^## / {
+                if (index($0, tag) > 0 || index($0, "[" num "]") > 0) { f = 1; next }
+                else if (f) { f = 0 }
+              }
+              f && /^---[[:space:]]*$/ { f = 0 }
+              f { print }
+            ' CHANGELOG.md > release_notes.md
+          fi
+          if [ ! -s release_notes.md ]; then
+            git tag -l --format='%(contents)' "$VERSION" > release_notes.md
+          fi
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v3
+        with:
+          draft: false
+          prerelease: false
+          generate_release_notes: true
+          body_path: release_notes.md
+          files: |
+            ${{ env.BINARY_NAME }}-*
+            dist/*
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  docker-build:
+    name: Build Docker Image
+    runs-on: ubuntu-latest
+    needs:
+      - setup
+      - build-test
+    if: needs.setup.outputs.has_source == 'true'
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v7
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v4
+
+      - name: Build multi-arch Docker image
+        run: |
+          docker buildx build \
+            --platform linux/amd64,linux/arm64 \
+            -t "${DOCKER_IMAGE_NAME}:latest" \
+            --target final \
+            .
+
+  publish-docker:
+    name: Publish Docker Image
+    runs-on: ubuntu-latest
+    needs: release
+    if: startsWith(github.ref, 'refs/tags/v')
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v7
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v4
+
+      - name: Log in to Docker Hub
+        uses: docker/login-action@v4
+        with:
+          username: ${{ secrets.DOCKER_USERNAME }}
+          password: ${{ secrets.DOCKER_PASSWORD }}
+
+      - name: Extract version from tag
+        id: get_version
+        run: echo "VERSION=${GITHUB_REF#refs/tags/v}" >> "$GITHUB_OUTPUT"
+
+      - name: Build and push multi-arch image
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          platforms: linux/amd64,linux/arm64
+          push: true
+          target: final
+          tags: |
+            ${{ secrets.DOCKER_USERNAME }}/${{ env.DOCKER_IMAGE_NAME }}:latest
+            ${{ secrets.DOCKER_USERNAME }}/${{ env.DOCKER_IMAGE_NAME }}:${{ steps.get_version.outputs.VERSION }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
