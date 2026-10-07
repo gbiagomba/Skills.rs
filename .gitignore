@@ -1,5 +1,7 @@
 # Rust
 /target/
+# An alternate cargo target directory present in some working trees.
+/executables/
 **/*.rs.bk
 # Cargo.lock IS committed: this is a binary crate and reproducible builds need it.
 

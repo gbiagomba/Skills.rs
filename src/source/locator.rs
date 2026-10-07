@@ -341,12 +341,37 @@ mod tests {
 
     #[test]
     fn parses_a_file_uri() {
-        let loc = parse("file:///absolute/path/my-skill/SKILL.md").unwrap();
-        assert_eq!(loc.source_type, SourceType::Filesystem);
-        assert_eq!(
-            loc.target,
-            Target::Path(PathBuf::from("/absolute/path/my-skill/SKILL.md"))
-        );
+        // A `file://` URI only names a path if it names one *on this platform*.
+        // On Windows a driveless path is not a local file path at all, so the
+        // expectation differs rather than the behaviour being wrong.
+        #[cfg(unix)]
+        {
+            let loc = parse("file:///absolute/path/my-skill/SKILL.md").unwrap();
+            assert_eq!(loc.source_type, SourceType::Filesystem);
+            assert_eq!(
+                loc.target,
+                Target::Path(PathBuf::from("/absolute/path/my-skill/SKILL.md"))
+            );
+        }
+        #[cfg(windows)]
+        {
+            let loc = parse("file:///C:/absolute/path/my-skill/SKILL.md").unwrap();
+            assert_eq!(loc.source_type, SourceType::Filesystem);
+            assert_eq!(
+                loc.target,
+                Target::Path(PathBuf::from(r"C:\absolute\path\my-skill\SKILL.md"))
+            );
+        }
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn a_driveless_file_uri_is_refused_on_windows() {
+        // Documents the real behaviour: there is no sensible local path for
+        // `file:///absolute/path` on Windows, so it is refused by name rather
+        // than silently resolved against an arbitrary drive.
+        let err = parse("file:///absolute/path/my-skill").unwrap_err();
+        assert!(matches!(err, Error::UnsupportedSource { .. }), "{err:?}");
     }
 
     #[test]

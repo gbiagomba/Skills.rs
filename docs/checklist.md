@@ -7,6 +7,13 @@ Status of every requirement in `docs/prompt.md`, as of 2026-10-07.
 the corresponding command exits **12** (`not_implemented`) rather than returning a
 misleading success.
 
+Windows note: the first CI run on a tag surfaced two genuine test defects that
+could not be caught on macOS, both tests hardcoding POSIX paths
+(`classifies_the_documented_special_directories` asserted the Linux managed
+settings directory, and `parses_a_file_uri` asserted a driveless `file://` path
+that Windows correctly refuses). Both are fixed, and the second now also asserts
+the Windows refusal explicitly. The implementation was correct in both cases.
+
 Verification run for this status: `cargo fmt --all -- --check`,
 `cargo clippy --all-targets --all-features -- -D warnings`, the same with
 `--no-default-features`, `cargo test --locked --all-features`,

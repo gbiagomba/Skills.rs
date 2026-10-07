@@ -314,8 +314,15 @@ mod tests {
             ClaudeCode.classify(&h, &skills.join(".trash/old")),
             Provenance::Ignored
         );
+        // Ask the platform for its managed-settings location rather than
+        // hardcoding the Linux one: on Windows this lives under ProgramData, and
+        // a hardcoded POSIX path silently stops testing anything there.
+        let managed = managed_roots()
+            .into_iter()
+            .next()
+            .expect("every platform declares a managed root");
         assert_eq!(
-            ClaudeCode.classify(&h, Path::new("/etc/claude-code/.claude/skills/corp")),
+            ClaudeCode.classify(&h, &managed.join("corp")),
             Provenance::OrgManaged
         );
         assert_eq!(

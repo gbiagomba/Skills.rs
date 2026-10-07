@@ -11,6 +11,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- Two tests hardcoded POSIX paths and failed on the Windows CI runner.
+  `classifies_the_documented_special_directories` now asks `managed_roots()` for
+  the platform's managed-settings location instead of asserting the Linux one,
+  and `parses_a_file_uri` uses a drive-qualified URI on Windows plus a new
+  `a_driveless_file_uri_is_refused_on_windows` test documenting that a driveless
+  `file://` URI is correctly refused there. The implementation was right in both
+  cases; only the tests assumed Unix
+
 ### Planned
 
 - Git backend: HTTPS, SSH, and SCP-style addresses, repository subdirectories,
