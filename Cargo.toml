@@ -1,6 +1,6 @@
 [package]
 name = "skill"
-version = "1.0.0"
+version = "1.1.0"
 authors = ["Gilles Biagomba <gilles.infosec@gmail.com>"]
 edition = "2021"
 rust-version = "1.88"
@@ -8,7 +8,7 @@ license = "GPL-3.0-only"
 description = "A cross-agent skill manager with safe copying, linking, migration, updates, and synchronization."
 repository = "https://github.com/gbiagomba/Skills.rs"
 readme = "README.md"
-keywords = ["cli", "agent", "skills", "claude", "codex"]
+keywords = ["cli", "agent", "skills", "claude", "copilot"]
 categories = ["command-line-utilities", "development-tools"]
 exclude = ["/.github", "/docs", "/scripts", "/Skills", "/rules", "/tests/fixtures"]
 

@@ -21,7 +21,7 @@
 //! Gemini CLI's user roots. Codex has no non-deprecated agent-specific user root
 //! at all. A user-scope install for Codex is therefore unavoidably visible to
 //! Gemini, and `skill` says so rather than implying isolation it cannot deliver.
-//! See [`Capabilities::isolated_user_root`] and [`SkillRoot::shared_with`].
+//! See [`Capabilities::isolated_user_root`] and [`registry::readers_of`].
 //!
 //! Facts in this module come from the vendor documentation retrieved 2026-10-07
 //! and recorded in `docs/compatibility.md`.
@@ -33,6 +33,7 @@ use crate::error::{Error, Result};
 
 pub mod claude;
 pub mod codex;
+pub mod copilot;
 pub mod gemini;
 pub mod registry;
 
@@ -210,11 +211,14 @@ pub struct SkillRoot {
     pub precedence: u8,
     /// True when `skill` is willing to deploy here.
     pub writable: bool,
-    /// Other agents that also read this directory.
+    /// False when this directory is a cross-client convention rather than one
+    /// this agent owns by name.
     ///
-    /// Non-empty means a deployment here is visible to agents the operator did
-    /// not select, which is disclosed rather than hidden.
-    pub shared_with: Vec<&'static str>,
+    /// Deliberately *not* a list of peer agents. An adapter cannot know who else
+    /// reads a shared directory without consulting every other adapter, and a
+    /// hardcoded list silently becomes wrong the moment an adapter is added.
+    /// [`crate::agent::registry::readers_of`] computes the real list instead.
+    pub agent_specific: bool,
     /// Default classification for anything found here.
     pub default_provenance: Provenance,
     /// Human description, shown by `skill agents`.
@@ -222,9 +226,12 @@ pub struct SkillRoot {
 }
 
 impl SkillRoot {
-    /// True when writing here makes the skill visible to an unselected agent.
-    pub fn is_shared(&self) -> bool {
-        !self.shared_with.is_empty()
+    /// True when this is a cross-client convention directory.
+    ///
+    /// Which agents actually read it is a registry question, not a per-adapter
+    /// one; see [`crate::agent::registry::readers_of`].
+    pub fn is_shared_convention(&self) -> bool {
+        !self.agent_specific
     }
 }
 
@@ -430,10 +437,11 @@ pub trait Agent: Send + Sync + std::fmt::Debug {
             .filter(|r| r.writable)
             .collect();
 
-        // Prefer an isolated root, then higher precedence.
+        // Prefer a root this agent owns by name, then higher precedence. An
+        // agent-specific directory is the only place isolation is even possible.
         writable.sort_by(|a, b| {
-            a.is_shared()
-                .cmp(&b.is_shared())
+            a.is_shared_convention()
+                .cmp(&b.is_shared_convention())
                 .then(b.precedence.cmp(&a.precedence))
         });
 

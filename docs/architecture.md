@@ -160,6 +160,7 @@ Nothing about agent behaviour is global, because the agents genuinely disagree:
 | --- | --- |
 | Claude Code | enterprise > personal > project |
 | Gemini CLI | highest tier wins, warning emitted |
+| Copilot CLI | first found wins, in its own documented location order |
 | Codex | neither wins; both appear |
 
 And the Agent Skills client guidance recommends project > user, the opposite of
@@ -178,10 +179,21 @@ directory through the platform API rather than `$HOME`, and
 acceptance tests build a complete fake machine in a temporary directory without
 touching a real installation.
 
-## The shared-root constraint
+## The shared-root constraint, and why sharing is computed
 
-`~/.agents/skills` is Codex's documented user root and simultaneously one of
-Gemini's. Codex has no non-deprecated agent-specific alternative. So:
+`~/.agents/skills` is read by three of the four agents, and Copilot CLI also
+reads a project's `.claude/skills`. Codex has no non-deprecated agent-specific
+alternative at all. So:
+
+Each adapter originally declared a hardcoded list of peer agents that share a
+root. Adding Copilot falsified two of those lists simultaneously: Codex's claimed
+only Gemini, and Claude Code's project root claimed no peers. A stale list
+**understates** exposure, which is the one direction that matters for a
+disclosure. `registry::readers_of` therefore computes the set by comparing every
+adapter's roots by physical path, and `SkillRoot` carries only `agent_specific`,
+a fact an adapter genuinely knows about itself. Adding a fifth agent now requires
+no change to the existing four, and a test asserts the Claude-project-to-Copilot
+case that no adapter declares.
 
 - `skill` prefers the agent-specific root where one exists;
 - a write into a shared root discloses which other agents can see it, and says

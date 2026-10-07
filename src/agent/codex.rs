@@ -109,7 +109,7 @@ impl Agent for Codex {
                     scope: Scope::User,
                     precedence: 5,
                     writable: false,
-                    shared_with: Vec::new(),
+                    agent_specific: true,
                     default_provenance: Provenance::BuiltIn,
                     label: "bundled by OpenAI (managed cache)".to_string(),
                 });
@@ -120,7 +120,7 @@ impl Agent for Codex {
                     scope: Scope::User,
                     precedence: 25,
                     writable: false,
-                    shared_with: Vec::new(),
+                    agent_specific: true,
                     default_provenance: Provenance::OrgManaged,
                     label: "admin (machine-wide)".to_string(),
                 });
@@ -133,7 +133,7 @@ impl Agent for Codex {
                     scope: Scope::User,
                     precedence: 20,
                     writable: true,
-                    shared_with: vec!["gemini"],
+                    agent_specific: false,
                     default_provenance: Provenance::Unmanaged,
                     label: "user (shared .agents convention)".to_string(),
                 });
@@ -144,7 +144,7 @@ impl Agent for Codex {
                     scope: Scope::User,
                     precedence: 15,
                     writable: false,
-                    shared_with: Vec::new(),
+                    agent_specific: true,
                     default_provenance: Provenance::Unmanaged,
                     label: "user (deprecated $CODEX_HOME/skills)".to_string(),
                 });
@@ -156,7 +156,7 @@ impl Agent for Codex {
                         scope: Scope::Project,
                         precedence: 10,
                         writable: true,
-                        shared_with: vec!["gemini"],
+                        agent_specific: false,
                         default_provenance: Provenance::Unmanaged,
                         label: "repo (shared .agents convention)".to_string(),
                     });
@@ -167,7 +167,7 @@ impl Agent for Codex {
                         scope: Scope::Project,
                         precedence: 8,
                         writable: false,
-                        shared_with: Vec::new(),
+                        agent_specific: true,
                         default_provenance: Provenance::Unmanaged,
                         label: "repo (.codex/skills, undocumented)".to_string(),
                     });
@@ -265,10 +265,11 @@ mod tests {
 
         assert_eq!(root.path, tmp.path().join(".agents/skills"));
         assert!(
-            root.is_shared(),
-            "the Codex user root is shared and that must be visible"
+            root.is_shared_convention(),
+            "the Codex user root is the shared convention directory"
         );
-        assert_eq!(root.shared_with, vec!["gemini"]);
+        // Which agents actually read it is a registry question; see
+        // `registry::readers_of` and its tests.
     }
 
     #[test]

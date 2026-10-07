@@ -52,6 +52,7 @@ impl Sandbox {
         match agent {
             "claude" => self.home().join(".claude/skills"),
             "codex" => self.home().join(".agents/skills"),
+            "copilot" => self.home().join(".copilot/skills"),
             "gemini" => self.home().join(".gemini/skills"),
             other => panic!("unknown agent {other}"),
         }

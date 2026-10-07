@@ -55,7 +55,7 @@ fn agents_reports_detection_evidence_and_shared_visibility() {
     assert_eq!(code, 0, "{stderr}");
     let value = envelope(&stdout);
     let agents = value["data"].as_array().expect("an array of agents");
-    assert_eq!(agents.len(), 3, "every supported adapter must be listed");
+    assert_eq!(agents.len(), 4, "every supported adapter must be listed");
 
     let claude = agents.iter().find(|a| a["id"] == "claude").unwrap();
     assert_eq!(claude["installed"], true);
@@ -77,12 +77,37 @@ fn agents_reports_detection_evidence_and_shared_visibility() {
         codex["isolated_user_root"], false,
         "Codex's documented user root is shared, so isolation is unavailable"
     );
-    assert_eq!(codex["shared_with"][0], "gemini");
+    let readers: Vec<&str> = codex["shared_with"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|v| v.as_str().unwrap())
+        .collect();
+    assert_eq!(
+        readers,
+        vec!["copilot", "gemini"],
+        "every agent reading ~/.agents/skills must be listed, computed not hardcoded"
+    );
 
     let gemini = agents.iter().find(|a| a["id"] == "gemini").unwrap();
     assert_eq!(
         gemini["installed"], false,
         "an agent with no executable must not be reported as installed"
+    );
+
+    // Copilot has its own personal directory, but it reads the shared .agents
+    // root too, so Codex's disclosure must name it.
+    let copilot = agents.iter().find(|a| a["id"] == "copilot").unwrap();
+    assert_eq!(copilot["isolated_user_root"], true);
+    let codex_readers: Vec<&str> = codex["shared_with"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|v| v.as_str().unwrap())
+        .collect();
+    assert!(
+        codex_readers.contains(&"copilot"),
+        "Copilot reads ~/.agents/skills, so it must appear: {codex_readers:?}"
     );
 }
 

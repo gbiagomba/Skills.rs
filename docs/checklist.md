@@ -1,6 +1,6 @@
 # Implementation checklist
 
-Status of every requirement in `docs/prompt.md`, as of 2026-10-07.
+Status of every requirement in `docs/prompt.md`, as of 2026-10-07 (v1.1.0).
 
 `Done` means implemented **and** covered by a test that would fail if it broke.
 `Partial` names exactly what is missing. `Not done` means not in this build, and
@@ -18,7 +18,7 @@ Verification run for this status: `cargo fmt --all -- --check`,
 `cargo clippy --all-targets --all-features -- -D warnings`, the same with
 `--no-default-features`, `cargo test --locked --all-features`,
 `cargo test --locked --no-default-features`, `cargo +1.88 check --locked --all-targets`,
-`actionlint`. All green. 240 tests pass (201 unit, 18 CLI, 21 safety).
+`actionlint`. All green. 255 tests pass (212 unit, 18 CLI, 25 safety).
 
 ## 1. Product and scope
 
@@ -82,7 +82,7 @@ Every one of the 28 documented example invocations parses, asserted by
 | Adapter-owned discovery, scopes, precedence, capabilities | Done | per-adapter tests |
 | Detection evidence, not a leftover directory | Done | `detection_separates_executable_from_leftover_directory` |
 | Resolve physical aliases, do not write twice | Done | `two_agents_resolving_to_one_directory_are_written_once` |
-| Disclose shared-root visibility, prefer specific paths | Done | `installing_for_codex_alone_discloses_gemini_visibility` |
+| Disclose shared-root visibility, prefer specific paths | Done | `installing_for_codex_alone_discloses_every_other_reader`, `a_claude_project_install_discloses_that_copilot_reads_it_too`. Computed from every adapter via `registry::readers_of`, never declared per agent |
 | Classify plugin, org, built-in, account-synced separately | Done | `classifies_the_documented_special_directories` and the per-adapter equivalents |
 | Require explicit adoption for unmanaged | Done | `an_existing_unmanaged_destination_is_never_overwritten` |
 | Unknown provenance stays unknown | Done | asserted in `classifies_the_documented_special_directories` |

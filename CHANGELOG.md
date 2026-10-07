@@ -11,16 +11,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-### Fixed
-
-- Two tests hardcoded POSIX paths and failed on the Windows CI runner.
-  `classifies_the_documented_special_directories` now asks `managed_roots()` for
-  the platform's managed-settings location instead of asserting the Linux one,
-  and `parses_a_file_uri` uses a drive-qualified URI on Windows plus a new
-  `a_driveless_file_uri_is_refused_on_windows` test documenting that a driveless
-  `file://` URI is correctly refused there. The implementation was right in both
-  cases; only the tests assumed Unix
-
 ### Planned
 
 - Git backend: HTTPS, SSH, and SCP-style addresses, repository subdirectories,
@@ -29,6 +19,54 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   with content sniffing and bounded redirects
 - Native SMB acquisition via the `smb2` backend, plus an isolated integration fixture
 - `update`, `migrate`, `export`, `import`, and `sync --adopt-from`
+
+## [1.1.0] - 2026-10-07
+
+### Added
+
+- **GitHub Copilot CLI adapter** (`copilot`, aliases `github-copilot` and
+  `copilot-cli`). This is the standalone `copilot` CLI (npm `@github/copilot`),
+  which GitHub documents as implementing the Agent Skills open standard. User
+  installs go to `~/.copilot/skills/`, project installs to `.github/skills/`,
+  which is the location Copilot documents first and highest
+- Copilot's other documented locations are discovered but not written:
+  `~/.agents/skills/`, project `.agents/skills/`, and project `.claude/skills/`.
+  The last is never written because a skill placed there would appear to belong
+  to Claude Code. Plugin directories are classified `plugin-managed`, and
+  organization or enterprise skills have no local file at all, so they are
+  reported as unmanageable rather than touched
+- `registry::readers_of`, which **computes** which agents can see a skill at a
+  given path by comparing every adapter's roots by physical path
+
+### Changed
+
+- **Shared-root visibility is now derived rather than declared.** `SkillRoot`
+  previously carried a hardcoded list of peer agents. Adding Copilot falsified
+  two of those lists at once: Codex's named only Gemini, and Claude Code's
+  project root claimed no peers even though Copilot reads `.claude/skills`. A
+  stale list understates exposure, which is the one direction that matters for a
+  safety disclosure, so `SkillRoot` now carries only `agent_specific` (a fact an
+  adapter knows about itself) and the registry computes the rest. Adding a fifth
+  agent needs no change to the existing four
+- A Codex user-scope install now discloses **both** Copilot and Gemini
+- The shared-root disclosure no longer claims "isolation is not available" for an
+  agent that does have an agent-specific directory, since that was only true for
+  Codex
+
+### Note on Copilot specifics
+
+- `gh skill` writes provenance metadata into a skill's `SKILL.md` frontmatter and
+  can pin it. `skill` preserves unknown frontmatter keys verbatim so that
+  metadata survives, but re-homing such a skill will break `gh skill update`.
+  Reported as a caveat rather than handled
+- Copilot symlink support is recorded as **undocumented**: its changelog says
+  symlinked skill directories load from 1.0.62, but GitHub documents nothing and
+  has an open issue about Windows behaviour, so `skill link` is not promised there
+- With `COPILOT_HOME` or `--config-dir` set, Copilot stops reading
+  `~/.agents/skills`, so a skill installed there becomes invisible to those
+  sessions
+- The deprecated `gh copilot` extension never supported skills, so `gh-copilot`
+  is deliberately **not** accepted as an alias
 
 ## [1.0.0] - 2026-10-07
 
@@ -80,6 +118,16 @@ First version of `skill`, a cross-agent skill manager.
   `docs/checklist.md` (honest per-requirement status), and `ATTRIBUTION.md`
 - 240 tests: 201 unit, 18 CLI acceptance, 21 safety acceptance. Every test builds
   an isolated fake machine and never touches a real agent installation
+
+### Fixed
+
+- Two tests hardcoded POSIX paths and failed on the Windows CI runner.
+  `classifies_the_documented_special_directories` now asks `managed_roots()` for
+  the platform's managed-settings location instead of asserting the Linux one,
+  and `parses_a_file_uri` uses a drive-qualified URI on Windows plus a new
+  `a_driveless_file_uri_is_refused_on_windows` test documenting that a driveless
+  `file://` URI is correctly refused there. The implementation was right in both
+  cases; only the tests assumed Unix
 
 ### Security
 

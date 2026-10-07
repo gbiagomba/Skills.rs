@@ -1,6 +1,6 @@
 # skill
 
-> VERSION: 1.0.0
+> VERSION: 1.1.0
 > DESCRIPTION: A cross-agent skill manager with safe copying, linking, migration, updates, and synchronization.
 > AUTHOR: Gilles Biagomba
 > LICENSE: GPL-3.0-only (dual-licensed, see [License](#-license))
@@ -65,9 +65,9 @@ installs, and it will refuse rather than guess.
   deployment, a conflict, or an ambiguous selection stops the operation with an
   actionable message.
 - **Honest agent modelling.** Each adapter encodes its own documented precedence,
-  discovery depth, and caveats, because the three agents genuinely disagree.
-- **Shared-root disclosure.** Codex's user root is shared with Gemini CLI;
-  `skill` says so rather than implying isolation it cannot deliver.
+  discovery depth, and caveats, because the four agents genuinely disagree.
+- **Computed shared-root disclosure.** Which agents can see a skill is derived
+  from every adapter rather than hardcoded, so it cannot understate exposure.
 - **Journalled transactions.** Per-target atomic replacement, a backup before any
   destructive step, crash recovery, and a `rollback` that refuses to discard work
   you did afterwards.
@@ -355,16 +355,26 @@ highest: defaults, the config file, environment variables, command-line flags.
 
 | Agent | id | Aliases | User skills path | Isolation |
 |---|---|---|---|---|
-| Claude Code | `claude` | `claude-code` | `~/.claude/skills/` | yes |
-| Codex | `codex` | `codex-cli` | `$HOME/.agents/skills/` | **no, shared with Gemini CLI** |
+| Claude Code | `claude` | `claude-code` | `~/.claude/skills/` | yes (user scope) |
+| Codex | `codex` | `codex-cli` | `$HOME/.agents/skills/` | **no, shared with Copilot and Gemini** |
+| GitHub Copilot CLI | `copilot` | `github-copilot`, `copilot-cli` | `~/.copilot/skills/` | yes (user scope) |
 | Gemini CLI | `gemini` | `gemini-cli` | `~/.gemini/skills/` | yes |
 
-`~/.agents/skills` is Codex's documented user root **and** one of Gemini CLI's.
-Codex has no non-deprecated agent-specific alternative, so a user-scope Codex
-install is unavoidably visible to Gemini. `skill` discloses this on every such
-write instead of promising isolation it cannot provide. Paths, precedence, and
-per-agent caveats are cited with retrieval dates in
-[`docs/compatibility.md`](docs/compatibility.md).
+Who can see a skill is **computed from every adapter**, never declared per agent,
+because a hardcoded peer list silently understates exposure the moment another
+agent is added. Two cases matter in practice:
+
+- `~/.agents/skills` is Codex's documented user root and is also read by Copilot
+  and Gemini. Codex has no non-deprecated agent-specific alternative, so a
+  user-scope Codex install is unavoidably visible to both.
+- Copilot CLI also reads a project's **`.claude/skills/`**, so a Claude Code
+  *project* install is visible to Copilot too. `skill` discloses that and never
+  writes into another agent's directory.
+
+`copilot` is the standalone `copilot` CLI (npm `@github/copilot`). The retired
+`gh copilot` extension never supported skills, so `gh-copilot` is deliberately
+**not** accepted as an alias. Paths, precedence, and per-agent caveats are cited
+with retrieval dates in [`docs/compatibility.md`](docs/compatibility.md).
 
 | Platform | Build | Behaviour verified |
 |---|---|---|

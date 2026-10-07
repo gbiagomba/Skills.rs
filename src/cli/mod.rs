@@ -41,7 +41,8 @@ fn exit_code_help() -> String {
     version,
     about = "A cross-agent skill manager with safe copying, linking, migration, updates, and synchronization.",
     long_about = "Install once, manage everywhere, never silently lose edits.\n\n\
-                  skill discovers installed coding agents (Claude Code, Codex, Gemini CLI) and \
+                  skill discovers installed coding agents (Claude Code, Codex, GitHub Copilot \
+                  CLI, and Gemini CLI) and \
                   manages reusable Agent Skills across them. It manages local CLI skill \
                   installations only. It does not synchronise hosted accounts, and installing \
                   locally never changes a cloud account.",

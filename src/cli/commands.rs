@@ -168,11 +168,18 @@ fn agents(ctx: &Context) -> Result<()> {
                 .as_ref()
                 .map(|r| r.path.display().to_string())
                 .unwrap_or_else(|| "(none)".into()),
-            write_root
-                .as_ref()
-                .filter(|r| r.is_shared())
-                .map(|r| format!("shared with {}", r.shared_with.join(", ")))
-                .unwrap_or_else(|| "isolated".into()),
+            match &write_root {
+                Some(root) => {
+                    let others =
+                        registry::readers_of(&ctx.host, Scope::User, &root.path, adapter.id());
+                    if others.is_empty() {
+                        "isolated".to_string()
+                    } else {
+                        format!("shared with {}", others.join(", "))
+                    }
+                }
+                None => "isolated".to_string(),
+            },
         ]);
 
         reports.push(AgentReport {
@@ -184,7 +191,12 @@ fn agents(ctx: &Context) -> Result<()> {
             user_write_path: write_root.as_ref().map(|r| r.path.clone()),
             shared_with: write_root
                 .as_ref()
-                .map(|r| r.shared_with.iter().map(|s| (*s).to_string()).collect())
+                .map(|r| {
+                    registry::readers_of(&ctx.host, Scope::User, &r.path, adapter.id())
+                        .into_iter()
+                        .map(|s| s.to_string())
+                        .collect()
+                })
                 .unwrap_or_default(),
             isolated_user_root: capabilities.isolated_user_root,
             symlink_support: capabilities.symlink,
@@ -780,13 +792,20 @@ fn prompt_for_agents(ctx: &Context) -> Result<Vec<&'static dyn agent::Agent>> {
         .map(|adapter| {
             let root = adapter.write_root(&ctx.host, ctx.config.scope).ok();
             match root {
-                Some(root) if root.is_shared() => format!(
-                    "{} -> {} (also read by {})",
-                    adapter.id(),
-                    root.path.display(),
-                    root.shared_with.join(", ")
-                ),
-                Some(root) => format!("{} -> {}", adapter.id(), root.path.display()),
+                Some(root) => {
+                    let others =
+                        registry::readers_of(&ctx.host, ctx.config.scope, &root.path, adapter.id());
+                    if others.is_empty() {
+                        format!("{} -> {}", adapter.id(), root.path.display())
+                    } else {
+                        format!(
+                            "{} -> {} (also read by {})",
+                            adapter.id(),
+                            root.path.display(),
+                            others.join(", ")
+                        )
+                    }
+                }
                 None => format!("{} (no writable location)", adapter.id()),
             }
         })

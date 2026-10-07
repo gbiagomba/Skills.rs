@@ -12,6 +12,7 @@ use std::path::{Path, PathBuf};
 
 use super::claude::ClaudeCode;
 use super::codex::Codex;
+use super::copilot::GitHubCopilot;
 use super::gemini::GeminiCli;
 use super::{Agent, Detection, Host, Provenance, Scope, SkillRoot};
 use crate::error::{Error, Result};
@@ -23,13 +24,45 @@ pub fn all() -> Vec<&'static dyn Agent> {
     // and no allocation or plugin machinery is needed.
     static CLAUDE: ClaudeCode = ClaudeCode;
     static CODEX: Codex = Codex;
+    static COPILOT: GitHubCopilot = GitHubCopilot;
     static GEMINI: GeminiCli = GeminiCli;
-    vec![&CLAUDE, &CODEX, &GEMINI]
+    vec![&CLAUDE, &CODEX, &COPILOT, &GEMINI]
 }
 
 /// Canonical ids, for error messages.
 pub fn known_ids() -> String {
     all().iter().map(|a| a.id()).collect::<Vec<_>>().join(", ")
+}
+
+/// Every agent, other than `excluding`, that reads the directory at `path`.
+///
+/// This is the single source of truth for "who else can see a skill installed
+/// here". It is computed rather than declared because an adapter cannot know its
+/// peers: a hardcoded peer list is correct only until the next adapter is added,
+/// and a stale list understates visibility, which is the one direction that
+/// matters. Copilot made this concrete by reading both `.agents/skills` levels
+/// *and* project `.claude/skills`.
+///
+/// Comparison is by physical path, so a symlinked root still matches.
+pub fn readers_of(host: &Host, scope: Scope, path: &Path, excluding: &str) -> Vec<&'static str> {
+    let wanted = physical_key(path);
+    let mut found: Vec<&'static str> = Vec::new();
+
+    for agent in all() {
+        if agent.id() == excluding {
+            continue;
+        }
+        let reads_it = agent
+            .roots(host, scope)
+            .iter()
+            .any(|root| physical_key(&root.path) == wanted);
+        if reads_it {
+            found.push(agent.id());
+        }
+    }
+
+    found.sort_unstable();
+    found
 }
 
 /// Resolve an id or alias to an adapter.
@@ -170,11 +203,12 @@ pub fn plan_destinations(
             continue;
         }
 
-        let also_visible_to: Vec<String> = root
-            .shared_with
-            .iter()
-            .filter(|other| !agents.iter().any(|a| a.id() == **other))
-            .map(|s| (*s).to_string())
+        // Who else reads this directory, excluding agents the operator selected
+        // (for those, the visibility is not news).
+        let also_visible_to: Vec<String> = readers_of(host, scope, &root.path, agent.id())
+            .into_iter()
+            .filter(|other| !agents.iter().any(|a| a.id() == *other))
+            .map(|s| s.to_string())
             .collect();
 
         if !also_visible_to.is_empty() {
@@ -182,6 +216,7 @@ pub fn plan_destinations(
                 agent.display_name(),
                 &root,
                 &also_visible_to,
+                agent.capabilities().isolated_user_root,
             ));
         }
 
@@ -200,11 +235,28 @@ pub fn plan_destinations(
 }
 
 /// Build the disclosure text for a deployment landing in a shared root.
-fn shared_root_disclosure(display: &str, root: &SkillRoot, others: &[String]) -> String {
+/// Build the disclosure text for a deployment landing in a directory others read.
+///
+/// The closing clause differs by agent, because the honest statement differs.
+/// For Codex there genuinely is no isolated alternative. For an agent that does
+/// have one, claiming otherwise would be false.
+fn shared_root_disclosure(
+    display: &str,
+    root: &SkillRoot,
+    others: &[String],
+    has_isolated_alternative: bool,
+) -> String {
+    let tail = if has_isolated_alternative {
+        format!(
+            "{display} does have an agent-specific directory, so this is either the only \
+             location for this scope or was chosen deliberately."
+        )
+    } else {
+        format!("{display} offers no alternative location, so isolation is not available here.")
+    };
     format!(
         "{display} will be installed into {}, which {} also read{}. This skill will be visible \
-         to {} even though {} not selected, and {display} offers no alternative location, so \
-         isolation is not available here.",
+         to {} even though {} not selected. {tail}",
         root.path.display(),
         others.join(" and "),
         if others.len() == 1 { "s" } else { "" },
@@ -298,12 +350,19 @@ mod tests {
 
         let plan = plan_destinations(&agents, &host, Scope::User, &name()).unwrap();
         assert_eq!(plan.destinations.len(), 1);
-        assert_eq!(plan.destinations[0].also_visible_to, vec!["gemini"]);
+        // Computed, not declared: both Copilot and Gemini read ~/.agents/skills.
+        // A hardcoded peer list in the Codex adapter said only "gemini" and
+        // became wrong the moment Copilot was added, which is why this is
+        // derived from the registry.
+        assert_eq!(
+            plan.destinations[0].also_visible_to,
+            vec!["copilot", "gemini"]
+        );
 
         let disclosure = plan.disclosures.join(" ");
         assert!(
-            disclosure.contains("visible to gemini"),
-            "shared visibility must be disclosed: {disclosure}"
+            disclosure.contains("copilot and gemini"),
+            "every reader must be disclosed: {disclosure}"
         );
         assert!(
             disclosure.contains("isolation is not available"),
@@ -312,14 +371,19 @@ mod tests {
     }
 
     #[test]
-    fn selecting_both_codex_and_gemini_does_not_double_report_visibility() {
-        // Gemini is selected, so "also visible to gemini" is not news.
+    fn a_selected_agent_is_not_reported_as_a_surprise_reader() {
+        // Gemini is selected, so "also visible to gemini" is not news. Copilot
+        // is not selected, so it still is.
         let tmp = tempfile::tempdir().unwrap();
         let host = Host::for_test(tmp.path());
         let agents = resolve_many(&["codex".to_string(), "gemini".to_string()]).unwrap();
 
         let plan = plan_destinations(&agents, &host, Scope::User, &name()).unwrap();
-        assert!(plan.destinations[0].also_visible_to.is_empty());
+        assert_eq!(
+            plan.destinations[0].also_visible_to,
+            vec!["copilot"],
+            "a selected agent must drop out of the disclosure, an unselected one must not"
+        );
         // And they land in different directories, because Gemini prefers its own.
         assert_eq!(plan.destinations.len(), 2);
         assert!(plan.destinations[1]
@@ -370,6 +434,69 @@ mod tests {
             .disclosures
             .iter()
             .any(|d| d.contains("not detected on this machine")));
+    }
+
+    #[test]
+    fn readers_of_finds_every_agent_sharing_the_agents_convention() {
+        let tmp = tempfile::tempdir().unwrap();
+        let host = Host::for_test(tmp.path());
+        let shared = tmp.path().join(".agents/skills");
+
+        let mut readers = readers_of(&host, Scope::User, &shared, "codex");
+        readers.sort_unstable();
+        assert_eq!(
+            readers,
+            vec!["copilot", "gemini"],
+            "the shared convention directory is read by three agents in total"
+        );
+
+        // An agent-specific root has no other readers.
+        assert!(readers_of(
+            &host,
+            Scope::User,
+            &tmp.path().join(".claude/skills"),
+            "claude"
+        )
+        .is_empty());
+    }
+
+    #[test]
+    fn a_claude_project_install_is_disclosed_as_visible_to_copilot() {
+        // Copilot CLI documents reading a project's .claude/skills, so Claude
+        // Code's project root stopped being isolated the moment Copilot was
+        // supported. Nothing in the Claude adapter had to change for this to be
+        // reported correctly, which is the point of computing it.
+        let tmp = tempfile::tempdir().unwrap();
+        let project = tmp.path().join("proj");
+        let host = Host::for_test(tmp.path()).with_project(Some(project.clone()));
+
+        let readers = readers_of(
+            &host,
+            Scope::Project,
+            &project.join(".claude/skills"),
+            "claude",
+        );
+        assert_eq!(readers, vec!["copilot"]);
+
+        let agents = resolve_many(&["claude".to_string()]).unwrap();
+        let plan = plan_destinations(&agents, &host, Scope::Project, &name()).unwrap();
+        assert_eq!(plan.destinations[0].also_visible_to, vec!["copilot"]);
+        assert!(
+            plan.disclosures
+                .iter()
+                .any(|d| d.contains("visible to copilot")),
+            "the operator must be told: {:?}",
+            plan.disclosures
+        );
+    }
+
+    #[test]
+    fn copilot_resolves_by_id_and_alias_but_not_by_the_retired_extension_name() {
+        assert_eq!(resolve("copilot").unwrap().id(), "copilot");
+        assert_eq!(resolve("github-copilot").unwrap().id(), "copilot");
+        assert_eq!(resolve("copilot-cli").unwrap().id(), "copilot");
+        // `gh copilot` is a different, deprecated product with no skills support.
+        assert!(resolve("gh-copilot").is_err());
     }
 
     #[test]

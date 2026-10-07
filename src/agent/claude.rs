@@ -108,7 +108,7 @@ impl Agent for ClaudeCode {
                         scope: Scope::User,
                         precedence: 30,
                         writable: false,
-                        shared_with: Vec::new(),
+                        agent_specific: true,
                         default_provenance: Provenance::OrgManaged,
                         label: "enterprise (managed settings)".to_string(),
                     });
@@ -123,7 +123,7 @@ impl Agent for ClaudeCode {
                     scope: Scope::User,
                     precedence: 20,
                     writable: true,
-                    shared_with: Vec::new(),
+                    agent_specific: true,
                     default_provenance: Provenance::Unmanaged,
                     label: "personal".to_string(),
                 });
@@ -136,7 +136,7 @@ impl Agent for ClaudeCode {
                     scope: Scope::User,
                     precedence: 20,
                     writable: false,
-                    shared_with: Vec::new(),
+                    agent_specific: true,
                     default_provenance: Provenance::AccountSynced,
                     label: "claude.ai account sync".to_string(),
                 });
@@ -145,7 +145,7 @@ impl Agent for ClaudeCode {
                     scope: Scope::User,
                     precedence: 0,
                     writable: false,
-                    shared_with: Vec::new(),
+                    agent_specific: true,
                     default_provenance: Provenance::Ignored,
                     label: "sync trash".to_string(),
                 });
@@ -157,7 +157,7 @@ impl Agent for ClaudeCode {
                         scope: Scope::Project,
                         precedence: 10,
                         writable: true,
-                        shared_with: Vec::new(),
+                        agent_specific: true,
                         default_provenance: Provenance::Unmanaged,
                         label: "project".to_string(),
                     });
@@ -260,7 +260,10 @@ mod tests {
         let root = ClaudeCode.write_root(&h, Scope::User).unwrap();
         assert_eq!(root.path, tmp.path().join(".claude/skills"));
         assert!(root.writable);
-        assert!(!root.is_shared(), "Claude Code's user root is its own");
+        assert!(
+            !root.is_shared_convention(),
+            "Claude Code's user root is its own, not a shared convention directory"
+        );
         assert!(ClaudeCode.capabilities().isolated_user_root);
     }
 

@@ -14,6 +14,7 @@ sources are actively changing.
 | Agent Skills specification | <https://agentskills.io/specification> | No version string exists anywhere on the page |
 | Claude Code skills | <https://code.claude.com/docs/en/skills> | |
 | Codex skills | <https://developers.openai.com/codex/skills/> | **308 redirect** to <https://learn.chatgpt.com/docs/build-skills> |
+| Copilot CLI skills | <https://docs.github.com/en/copilot/reference/copilot-cli-reference/cli-command-reference> | section "Skill locations"; the how-to pages omit the full table |
 | Gemini CLI skills | <https://geminicli.com/docs/cli/skills/> | Confirmed official; matches `google-gemini/gemini-cli` `docs/cli/skills.md` on `main` |
 | vercel-labs/skills | <https://github.com/vercel-labs/skills> | v1.7.1, 2026-10-06. MIT, Copyright (c) 2026 Vercel, Inc. |
 
@@ -70,14 +71,25 @@ packages. So:
 This is the single most consequential compatibility fact, and it constrains what
 `skill` can honestly promise.
 
-`~/.agents/skills` is **simultaneously Codex's documented user root and one of
-Gemini CLI's user roots**. Project `.agents/skills` is shared the same way.
+`~/.agents/skills` is read by **three** of the four supported agents: it is
+Codex's documented user root, one of Gemini CLI's, and (since Copilot CLI 1.0.11)
+one of Copilot's. Project `.agents/skills` is shared the same way, and Copilot
+additionally reads project `.claude/skills`.
 
-| Agent | Agent-specific user root | Shared user root | Isolation available? |
+| Agent | Agent-specific user root | Also reads | Isolation available? |
 | --- | --- | --- | --- |
-| Claude Code | `~/.claude/skills/` | none documented | yes |
-| Gemini CLI | `~/.gemini/skills/` | `~/.agents/skills/` | yes, by preferring the specific root |
+| Claude Code | `~/.claude/skills/` | none at user scope | yes at user scope; **no at project scope**, because Copilot reads `.claude/skills` |
 | Codex | only the deprecated `~/.codex/skills` | `$HOME/.agents/skills` | **no** |
+| GitHub Copilot CLI | `~/.copilot/skills/` | `~/.agents/skills/`, project `.github`/`.agents`/`.claude` | yes at user scope |
+| Gemini CLI | `~/.gemini/skills/` | `~/.agents/skills/` | yes, by preferring the specific root |
+
+**This is why sharing is computed rather than declared.** Each adapter used to
+carry a hardcoded list of peer agents. Adding Copilot made two of those lists
+wrong at once: Codex's said only `gemini`, and Claude Code's project root claimed
+no peers at all. A stale list understates exposure, which is the one direction
+that matters, so `registry::readers_of` now derives the real set by comparing
+every adapter's roots by physical path. Adding a fifth agent requires no change
+to the existing four.
 
 Consequences, all implemented:
 
@@ -160,6 +172,65 @@ The folder-trust rule is why a successful `--scope project` write to Gemini is
 reported as written-but-possibly-inactive, never as loaded. Gemini also ships its
 own `gemini skills install|uninstall|link`, so skills it installed appear to
 `skill` as unmanaged and need explicit adoption.
+
+### GitHub Copilot CLI
+
+The standalone `copilot` CLI (npm `@github/copilot`). GitHub states explicitly
+that this implements the Agent Skills open standard. Skills shipped around CLI
+0.0.371 (2025-12-18); project `.agents/skills` landed in 0.0.401 (2026-02-03) and
+personal `~/.agents/skills` in 1.0.11 (2026-03-23), the latter explicitly for
+cross-tool interoperability.
+
+**Not the same product as `gh copilot`.** That extension was deprecated on
+2025-10-25, only ever offered `suggest`/`explain`, and has no skills support.
+`skill` therefore does **not** accept `gh-copilot` as an alias, since doing so
+would imply it manages something it does not. (The separate newer `gh skill`
+command is skills-aware, but that is gh CLI core, not the deprecated extension.)
+
+Documented skill locations, in Copilot's own priority order, first found winning
+for a duplicate name:
+
+| Location | Scope | `skill` behaviour |
+| --- | --- | --- |
+| `.github/skills/` | project | **write target** for project scope |
+| `.agents/skills/` | project | discovered, and written on request; shared, so disclosed |
+| `.claude/skills/` | project | **discovered, never written.** A skill placed there would appear to be Claude Code's |
+| parent `.github/skills/` | inherited | monorepo support; not written |
+| `~/.copilot/skills/` | personal | **write target** for user scope, and agent-specific |
+| `~/.agents/skills/` | personal | discovered; shared with Codex and Gemini, so disclosed |
+| plugin directories | plugin | classified `plugin-managed`, never touched |
+| `COPILOT_SKILLS_DIRS` | custom | not written |
+| bundled | built-in | lowest priority, never touched |
+| org/enterprise relay | remote | **no local file at all**; fetched on demand, so not manageable locally |
+
+| Aspect | Value |
+| --- | --- |
+| Executable | `copilot` (`copilot version`); config dir `~/.copilot` or `COPILOT_HOME` |
+| Same-name | shadows, first found wins. Two plugins may both provide one name and coexist under plugin-qualified invocation |
+| Frontmatter read | `name` (max 64, may contain colons for namespacing), `description` (max 1024), `argument-hint`, `allowed-tools`, `user-invocable`, `disable-model-invocation`, `license`. Unknown fields load with a warning rather than being skipped |
+| Symlinks | **undocumented.** Its changelog says they load from 1.0.62, but GitHub documents nothing and has an open issue (#3264) about Windows behaviour, so `skill` records `SymlinkSupport::Undocumented` and does not promise `link` here |
+| Relocation | `COPILOT_HOME` / `--config-dir` move the config root. **Caveat:** per CLI 1.0.66, setting either stops Copilot reading `~/.agents/skills`, so a skill installed there becomes invisible to those sessions |
+| Restriction settings | `skillDirectories`, `ignoredSkillsLocations`, `disabledSkills` in `~/.copilot/settings.json`; a repository's `disabledSkills` merges as a union the user cannot undo |
+| Verify loaded | `copilot skill list --json` (rows carry `name`, `description`, `source`, `path`, `enabled`), or `/skills info NAME` in session |
+
+Two further facts `skill` acts on:
+
+- **`gh skill` writes provenance metadata into a skill's `SKILL.md` frontmatter**
+  (source repository, ref, and tree SHA; the exact key names are not documented)
+  and can pin a skill against updates. `skill` preserves unknown frontmatter keys
+  verbatim, so that metadata survives a copy, but re-homing such a skill will
+  break `gh skill update`. This is recorded as a caveat rather than handled.
+- **Organization and enterprise skills have no local file.** They are projected
+  through GitHub's relay and fetched on demand, so they are outside the reach of
+  any local manager.
+
+Copilot also supports skills in VS Code and JetBrains agent mode, the cloud
+coding agent, and code review. Those surfaces are **out of scope**: this adapter
+manages the local CLI installation only. Worth knowing if you author for both:
+VS Code additionally reads `~/.claude/skills/`, which the CLI does not, and VS
+Code enforces stricter `name` rules than the CLI (lowercase only, no colons, must
+match the directory name), so a CLI-style namespaced `name: my-plugin:search`
+silently fails to load in VS Code.
 
 ## Relationship to vercel-labs/skills
 

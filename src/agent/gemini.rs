@@ -109,7 +109,7 @@ impl Agent for GeminiCli {
                     scope: Scope::User,
                     precedence: 30,
                     writable: true,
-                    shared_with: Vec::new(),
+                    agent_specific: true,
                     default_provenance: Provenance::Unmanaged,
                     label: "user (.gemini/skills)".to_string(),
                 });
@@ -122,7 +122,7 @@ impl Agent for GeminiCli {
                     scope: Scope::User,
                     precedence: 40,
                     writable: true,
-                    shared_with: vec!["codex"],
+                    agent_specific: false,
                     default_provenance: Provenance::Unmanaged,
                     label: "user (shared .agents alias, outranks .gemini)".to_string(),
                 });
@@ -134,7 +134,7 @@ impl Agent for GeminiCli {
                         scope: Scope::Project,
                         precedence: 50,
                         writable: true,
-                        shared_with: Vec::new(),
+                        agent_specific: true,
                         default_provenance: Provenance::Unmanaged,
                         label: "workspace (.gemini/skills)".to_string(),
                     });
@@ -143,7 +143,7 @@ impl Agent for GeminiCli {
                         scope: Scope::Project,
                         precedence: 60,
                         writable: true,
-                        shared_with: vec!["codex"],
+                        agent_specific: false,
                         default_provenance: Provenance::Unmanaged,
                         label: "workspace (shared .agents alias)".to_string(),
                     });
@@ -252,7 +252,7 @@ mod tests {
             tmp.path().join(".gemini/skills"),
             "isolation is available for Gemini, so it must be chosen by default"
         );
-        assert!(!root.is_shared());
+        assert!(!root.is_shared_convention());
     }
 
     #[test]

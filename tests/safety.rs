@@ -121,7 +121,7 @@ fn two_agents_sharing_one_directory_are_written_once() {
 }
 
 #[test]
-fn installing_for_codex_alone_discloses_gemini_visibility() {
+fn installing_for_codex_alone_discloses_every_other_reader() {
     let sandbox = Sandbox::new();
     sandbox.install_agent("codex");
     let source = sandbox.write_skill("disclosed");
@@ -140,15 +140,17 @@ fn installing_for_codex_alone_discloses_gemini_visibility() {
         .map(|n| n.as_str().unwrap())
         .collect::<Vec<_>>()
         .join(" ");
+    // Copilot and Gemini both read ~/.agents/skills. Both must be named: a
+    // disclosure that lists only some readers understates the exposure.
     assert!(
-        joined.contains("visible to gemini"),
-        "shared visibility must be disclosed: {joined}"
+        joined.contains("visible to copilot and gemini"),
+        "every reader must be disclosed: {joined}"
     );
     assert!(
         joined.contains("isolation is not available"),
         "we must not imply isolation Codex cannot provide: {joined}"
     );
-    assert!(stderr.contains("visible to gemini"), "{stderr}");
+    assert!(stderr.contains("copilot and gemini"), "{stderr}");
 }
 
 #[test]
@@ -707,5 +709,96 @@ fn a_gemini_project_install_discloses_the_folder_trust_caveat() {
     assert!(
         notes.contains("untrusted folder"),
         "the trust caveat must reach the operator: {notes}"
+    );
+}
+
+#[test]
+fn copies_to_github_copilot_and_reports_its_own_personal_directory() {
+    let sandbox = Sandbox::new();
+    sandbox.install_agent("copilot");
+    let source = sandbox.write_skill("for-copilot");
+
+    let (code, _, stderr) = run(sandbox.cmd().arg("copy").arg(&source).arg("copilot"));
+    assert_eq!(code, 0, "{stderr}");
+
+    let deployed = sandbox.agent_skills("copilot").join("for-copilot");
+    assert!(deployed.join("scripts/run.sh").is_file());
+    assert_eq!(
+        digest(&source),
+        digest(&deployed),
+        "a copy must reproduce the source exactly"
+    );
+
+    // Copilot owns ~/.copilot/skills, so a user-scope install needs no
+    // shared-visibility disclosure at all.
+    assert!(
+        !stderr.contains("will be visible to"),
+        "an isolated root must not produce a sharing disclosure: {stderr}"
+    );
+}
+
+#[test]
+fn the_documented_github_copilot_alias_works() {
+    let sandbox = Sandbox::new();
+    sandbox.install_agent("copilot");
+    let source = sandbox.write_skill("aliased-copilot");
+
+    let (code, _, stderr) = run(sandbox.cmd().arg("copy").arg(&source).arg("github-copilot"));
+    assert_eq!(code, 0, "{stderr}");
+    assert!(sandbox
+        .agent_skills("copilot")
+        .join("aliased-copilot")
+        .is_dir());
+}
+
+#[test]
+fn a_claude_project_install_discloses_that_copilot_reads_it_too() {
+    // Copilot CLI documents reading a project's .claude/skills directory, so a
+    // Claude Code project install is not isolated. The Claude adapter declares
+    // nothing about Copilot; this is computed from the registry.
+    let sandbox = Sandbox::new();
+    sandbox.install_agent("claude");
+    let source = sandbox.write_skill("shared-project");
+
+    let (code, stdout, stderr) = run(sandbox
+        .cmd()
+        .arg("copy")
+        .arg(&source)
+        .args(["claude", "--scope", "project", "--project-dir"])
+        .arg(sandbox.project())
+        .arg("--json"));
+    assert_eq!(code, 0, "{stderr}");
+
+    let notes = envelope(&stdout)["notes"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|n| n.as_str().unwrap().to_string())
+        .collect::<Vec<_>>()
+        .join(" ");
+    assert!(
+        notes.contains("visible to copilot"),
+        "the operator must be told Copilot can see it: {notes}"
+    );
+}
+
+#[test]
+fn copilot_project_installs_go_to_dot_github_skills() {
+    // Copilot documents .github/skills as its first and highest-priority
+    // project location.
+    let sandbox = Sandbox::new();
+    sandbox.install_agent("copilot");
+    let source = sandbox.write_skill("proj-skill");
+
+    let (code, _, stderr) = run(sandbox
+        .cmd()
+        .arg("copy")
+        .arg(&source)
+        .args(["copilot", "--scope", "project", "--project-dir"])
+        .arg(sandbox.project()));
+    assert_eq!(code, 0, "{stderr}");
+    assert!(
+        sandbox.project().join(".github/skills/proj-skill").is_dir(),
+        "a Copilot project install belongs in .github/skills"
     );
 }
