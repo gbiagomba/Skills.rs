@@ -1,5 +1,5 @@
 # install.ps1
-# Windows installer for program_name (satisfies RULE 3)
+# Windows installer for skill (satisfies RULE 3)
 
 param(
     [string]$InstallMethod = "auto"
@@ -7,8 +7,8 @@ param(
 
 $ErrorActionPreference = "Stop"
 
-$APP_NAME = "program_name"
-$REPO = "gbiagomba/$APP_NAME"
+$APP_NAME = "skill"
+$REPO = "gbiagomba/Skills.rs"
 $INSTALL_DIR = "$env:ProgramFiles\$APP_NAME"
 
 Write-Host "?? Installing $APP_NAME..." -ForegroundColor Cyan
