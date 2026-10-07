@@ -11,6 +11,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **`docker-build` hung every CI run.** It cross-built `linux/arm64` under QEMU
+  emulation, which compiles Rust at emulated speed and left every run sitting
+  `in_progress` for hours after the real gate had already passed. It now builds
+  native `amd64` only and runs the image once to prove the Dockerfile works;
+  multi-arch belongs to the publish step, which is tag-only and rare
+- **`publish-docker` failed on every tag** when `DOCKER_USERNAME` and
+  `DOCKER_PASSWORD` were unset, making a perfectly good release look broken. It
+  now checks for credentials first and skips with a notice instead of failing
+
 ### Planned
 
 - Git backend: HTTPS, SSH, and SCP-style addresses, repository subdirectories,
