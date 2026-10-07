@@ -5,52 +5,123 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+> **Note on version history.** Versions 1.0.0 through 1.0.2 in this repository's
+> earlier history belonged to the project **template** this repository was created
+> from, not to `skill`. The 1.0.0 entry below is `skill`'s own first version.
+
 ## [Unreleased]
 
-### Added
-- Feature in development
+### Planned
 
-## [1.0.2] - 2026-10-07
+- Git backend: HTTPS, SSH, and SCP-style addresses, repository subdirectories,
+  requested ref versus resolved commit, and immutable pins
+- HTTP(S) backend: standalone files and `.zip`/`.tar`/`.tar.gz`/`.tgz` archives
+  with content sniffing and bounded redirects
+- Native SMB acquisition via the `smb2` backend, plus an isolated integration fixture
+- `update`, `migrate`, `export`, `import`, and `sync --adopt-from`
 
-### Fixed
-- `docker-build` job declared `needs: [test-linux, test-macos, test-windows]`, three jobs that do not exist in this workflow. This was a workflow validation error that aborted every CI run at 0 seconds
-- Job-level `if: env.PROJECT_TYPE == 'rust'` conditions never evaluated true, because the `env` context is not available in a job-level `if`. The aarch64 build jobs were therefore always skipped, which in turn skipped the `release` job. Project type now resolves through a `setup` job output
-- Release notes extraction only matched `## v1.0.0` headings and silently missed the Keep a Changelog `## [1.0.0] - DATE` form used by this repo, always falling back to the tag message
-- Replaced the retired `macos-13` runner label with `macos-15-intel`
-- Replaced hardcoded `ssltriage` Docker image names, left over from another project, with a `DOCKER_IMAGE_NAME` template variable
+## [1.0.0] - 2026-10-07
 
-### Added
-- `setup` job that validates `PROJECT_TYPE` and reports whether buildable source exists, so an unfilled template scaffold reports success instead of failing on an empty project
-- Explicit `shell: bash` on multi-line steps so they behave consistently on the Windows runner
-
-### Changed
-- `release` job uses `always()` with explicit result checks, so a Python project is still released when the Rust-only aarch64 jobs are skipped
-
-## [1.0.1] - 2026-10-07
-
-### Fixed
-- Replaced leftover `Sherlock` project branding in `TRADEMARK_POLICY.md` with the `APP_NAME` placeholder so the template carries no inherited project name
-- Removed stray `.gitignore??????` file left behind by an interrupted write
-
-### Changed
-- `.gitignore` now excludes `CLAUDE_AGENT_CONVO.txt` session transcripts
-- Synced `dev` with `main`, bringing in `actions/checkout@v7` and `actions/setup-python@v7` from [#20](https://github.com/gbiagomba/Template/pull/20) and [#21](https://github.com/gbiagomba/Template/pull/21)
-
-## [1.0.0] - 2025-12-05
+First version of `skill`, a cross-agent skill manager.
 
 ### Added
-- Initial release
-- Core functionality implemented
-- Multi-platform support (Linux, macOS, Windows)
-- Cross-architecture builds (x64, ARM64)
-- GitHub Actions CI/CD pipeline
-- Docker support
-- Comprehensive README and documentation
+
+- **Agent adapters** for Claude Code, Codex, and Gemini CLI, each owning its own
+  discovery roots, precedence order, capabilities, and provenance classification.
+  Accepts the `claude-code` and `gemini-cli` aliases. Precedence is per adapter
+  because the three agents genuinely disagree: Claude Code resolves enterprise
+  over personal over project, Gemini CLI lets the highest tier win, and Codex
+  keeps both same-named skills
+- **Shared-root disclosure.** `~/.agents/skills` is Codex's documented user root
+  and simultaneously one of Gemini CLI's, and Codex has no non-deprecated
+  agent-specific alternative. Every write into a shared root discloses which other
+  agents can see it and states that isolation is unavailable, rather than implying
+  otherwise. Two agents resolving to one physical directory are written once
+- **Detection by evidence**, not a boolean: a leftover skills directory is
+  reported as "directory present, executable absent"
+- **Canonical store** at `~/skills`, with manager state kept in the platform data
+  directory so it is never hashed as package content
+- **`copy`** and **`link`** from local paths and `file://` URIs, covering single
+  packages, collections, standalone Markdown files, and a `SKILL.md` inside a
+  package (which imports the whole package boundary)
+- **Three-way reconciliation** over separate upstream, canonical, and
+  per-destination baselines, implementing the full documented truth table.
+  `status`, `diff`, and `sync` share one pure comparison function
+- **`doctor`** and **`rollback`**, with journalled transactions, per-target atomic
+  replacement, backups before any destructive step, crash recovery, and an
+  exclusive lock so concurrent runs cannot race
+- **Schema-versioned SQLite state store** recording stable package identity,
+  sanitized locators, requested ref and resolved revision, pin policy,
+  per-destination deployment baselines with per-file digests and modes,
+  transaction history, and backups
+- **Hardened path handling**: traversal, absolute entries, drive letters and
+  alternate data streams, reserved Windows device names, trailing dots and
+  spaces, case collisions, escaping symlinks, ancestor symlinks and reparse
+  points, device and FIFO nodes, setuid/setgid/sticky bits, and bounded size,
+  count, and depth. Containment is re-verified immediately before each mutation
+- **Stable documented exit codes** (0 to 12), with the `--help` epilogue generated
+  from the same table so documentation cannot drift from behaviour
+- **Schema-versioned JSON output**: one object on stdout, diagnostics on stderr,
+  and a `dry_run` field so a plan cannot be mistaken for a performed operation
+- **Layered configuration**: defaults, config file, `SKILL_*` environment, then
+  flags. See `examples/config.toml`
+- Documentation: `docs/architecture.md`, `docs/compatibility.md` (every vendor
+  claim cited with its 2026-10-07 retrieval date), `docs/security.md`,
+  `docs/checklist.md` (honest per-requirement status), and `ATTRIBUTION.md`
+- 240 tests: 201 unit, 18 CLI acceptance, 21 safety acceptance. Every test builds
+  an isolated fake machine and never touches a real agent installation
 
 ### Security
-- Secure coding practices applied
-- Input validation implemented
-- Error handling hardened
+
+- **Nothing acquired is ever executed.** No scripts, hooks, or install steps run
+  during acquisition or validation
+- An existing **unmanaged** destination is never overwritten (exit 11), and a
+  destination we **do** manage is not overwritten when it has been edited since we
+  wrote it (exit 3). `--yes` overrides neither
+- Plugin-managed, org-managed, built-in, and account-synced skills are classified
+  separately and left alone. Unknown provenance stays unknown
+- HTTPS verification is always on; plain HTTP requires `--allow-http`, which
+  `--yes` does not grant; an HTTPS to HTTP redirect is always refused
+- Credentials never appear on a command line, in a stored locator, a manifest, an
+  export, a log, or an error message. Userinfo, query, and fragment are stripped
+  before anything is persisted
+- State, journals, and backups are created mode 0600 in 0700 directories
+- `rollback` refuses to discard edits made after the transaction it is undoing
+- No telemetry, and no network call that was not requested
+- Documented plainly: a digest proves integrity against a recorded value, not
+  publisher trust or skill safety
+
+### Changed
+
+- Replaced the project template's placeholders with real content: `Cargo.toml`,
+  `Makefile` (upgraded to the Pro variant, plus `msrv` and `audit`), `Dockerfile`
+  (multi-stage, non-root, no git or samba packages needed since both backends are
+  pure Rust), the CI workflow, `README.md`, and the install scripts
+- `.gitignore` no longer excludes `Cargo.lock`: this is a binary crate and
+  reproducible builds require it committed
+- CI: added MSRV and feature-matrix jobs, tag-versus-`Cargo.toml` validation,
+  artifact upload on every successful build rather than only on tags, and a
+  top-level read-only permission with `contents: write` scoped to the release job
+
+### Removed
+
+- `ChatGPT_AGENTS.md`, `Claude_AGENTS.md`, and `Orginal_AGENTS.md`, which
+  `AGENT.md` marked as reference-only and superseded
+- `.version-tracking-template.md`, whose only purpose was to seed
+  `.version-tracking.md`
+- A committed `.greprules/plugin-data/` tool log, now git-ignored
+
+### Known limitations
+
+- `migrate`, `update`, `export`, `import`, and `sync --adopt-from` are documented
+  and designed but **not implemented**; they exit **12** and point at
+  `docs/checklist.md`. They never report success
+- The Git, HTTP(S), and native SMB backends are **not implemented**; their
+  locators parse and classify correctly, and acquisition exits 12
+- Native SMB is **not verified**. Mounted shares work through the filesystem
+  backend and are deliberately labelled mounted-path support, not native SMB
+- Windows behaviour is verified only to the extent that it compiles in CI;
+  adversarial path tests have run on macOS only
 
 ---
 

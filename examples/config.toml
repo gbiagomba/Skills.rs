@@ -1,0 +1,60 @@
+# Example configuration for `skill`.
+#
+# Location, resolved through the platform application directories:
+#   Linux    ~/.config/skill/config.toml
+#   macOS    ~/Library/Application Support/skill/config.toml
+#   Windows  %APPDATA%\skill\config.toml
+#
+# Find the exact path on this machine with `skill doctor`, and point at a
+# different file with `--config` or SKILL_CONFIG.
+#
+# Precedence, lowest to highest: these defaults, then this file, then the
+# SKILL_* environment variables, then command-line flags.
+#
+# Every key is optional. An unknown key is a usage error rather than being
+# ignored, so a typo is reported instead of silently doing nothing.
+
+# The canonical store. Package content lives here and nothing else; manager
+# state is kept elsewhere so it is never mistaken for package drift.
+# A leading "~/" is expanded against the platform home directory.
+store = "~/skills"
+
+# Destinations to use when none are named on the command line. Setting this is
+# what lets a non-interactive run (CI, a script) succeed without --all-detected.
+# Accepts ids or documented aliases: claude, claude-code, codex, gemini, gemini-cli.
+default_agents = ["claude"]
+
+# Scope used when --scope is absent. "user" or "project".
+default_scope = "user"
+
+# Permit plain HTTP without passing --allow-http every time.
+# Off unless set. Leaving it off is strongly preferred: plain HTTP is
+# unauthenticated and readable in transit, and --yes deliberately does not
+# enable it.
+allow_http = false
+
+# Refuse all network access. Equivalent to passing --offline on every run.
+offline = false
+
+# Agents to treat as configured even when their executable is not present, for
+# example a machine you deploy to but do not run the agent on. The absence is
+# still reported; it is just not an error.
+configured_agents = []
+
+# Bounds applied to acquisition and extraction. The defaults are shown. Raise
+# them only for a source you trust: they are what stops an archive bomb.
+[limits]
+# Maximum compressed bytes accepted from a network source.
+max_download_bytes = 33554432   # 32 MiB
+# Maximum total bytes written while extracting one archive.
+max_extract_bytes = 134217728   # 128 MiB
+# Maximum bytes for any single file in a package.
+max_file_bytes = 33554432       # 32 MiB
+# Maximum number of entries in one package.
+max_files = 4096
+# Maximum directory nesting inside a package.
+max_depth = 32
+# Maximum HTTP redirects followed. An HTTPS to HTTP redirect is always refused.
+max_redirects = 5
+# Per-request timeout, in seconds.
+timeout_secs = 30

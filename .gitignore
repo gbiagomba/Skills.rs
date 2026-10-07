@@ -1,7 +1,7 @@
 # Rust
 /target/
 **/*.rs.bk
-Cargo.lock
+# Cargo.lock IS committed: this is a binary crate and reproducible builds need it.
 
 # IDEs
 .idea/
@@ -32,3 +32,13 @@ test_data/
 
 # Misc
 CLAUDE_AGENT_CONVO.txt
+
+# skill test and runtime artifacts
+*.sqlite3
+*.sqlite3-wal
+*.sqlite3-shm
+/skills-backup.tar.gz
+/my-skill.tar.gz
+*.bundle
+/tmp-fixtures/
+.greprules/plugin-data/

@@ -1,14 +1,64 @@
 [package]
-name = "binary_name"          # MUST match APP_NAME
-version = "1.0.0"              # SemVer
+name = "skill"
+version = "1.0.0"
 authors = ["Gilles Biagomba <gilles.infosec@gmail.com>"]
 edition = "2021"
-license = "GPL-3.0"
-description = "Brief description"
-repository = "https://github.com/gbiagomba/project_name"
-keywords = ["cli", "tool", "category"]
-categories = ["command-line-utilities"]
+rust-version = "1.88"
+license = "GPL-3.0-only"
+description = "A cross-agent skill manager with safe copying, linking, migration, updates, and synchronization."
+repository = "https://github.com/gbiagomba/Skills.rs"
+readme = "README.md"
+keywords = ["cli", "agent", "skills", "claude", "codex"]
+categories = ["command-line-utilities", "development-tools"]
+exclude = ["/.github", "/docs", "/scripts", "/Skills", "/rules", "/tests/fixtures"]
 
 [[bin]]
-name = "binary_name"           # MUST match package name
+name = "skill"
 path = "src/main.rs"
+
+[lib]
+name = "skill"
+path = "src/lib.rs"
+
+[profile.release]
+strip = true
+
+[dependencies]
+camino = "1.2.6"
+clap = { version = "4.6.7", features = ["derive"] }
+directories = "6.0.0"
+flate2 = "1.1.10"
+fs4 = "1.1.0"
+gix = "0.87.1"
+hex = "0.4.3"
+indexmap = "2.14.2"
+inquire = "0.9.4"
+rusqlite = { version = "0.40.2", features = ["bundled"] }
+serde = { version = "1.0.229", features = ["derive"] }
+serde_json = "1.0.151"
+serde_yaml_ng = "0.10.0"
+sha2 = "0.11.0"
+similar = "3.2.0"
+smb2 = { version = "0.27.2", optional = true }
+tar = "0.4.46"
+tempfile = "3.27.0"
+thiserror = "2.0.21"
+toml = "1.1.6"
+tracing = "0.1.44"
+tracing-subscriber = "0.3.23"
+ureq = { version = "3.4.2", features = ["rustls"] }
+url = "2.5.8"
+walkdir = "2.5.0"
+zip = "7.2.0"
+
+[features]
+default = ["smb"]
+# Native SMB2/3 acquisition via the pure-Rust `smb2` crate. No system library needed.
+smb = ["dep:smb2"]
+# Opt in to the live SMB integration fixture (requires a reachable Samba server).
+smb-it = ["smb"]
+
+[dev-dependencies]
+assert_cmd = "2.2.2"
+predicates = "3.1.4"
+serde_json = "1.0.151"

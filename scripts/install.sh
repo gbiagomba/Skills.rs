@@ -4,8 +4,8 @@
 
 set -e
 
-APP_NAME="program_name"
-REPO="gbiagomba/${APP_NAME}"
+APP_NAME="skill"
+REPO="gbiagomba/Skills.rs"
 INSTALL_DIR="/usr/local/bin"
 
 echo "?? Installing ${APP_NAME}..."
