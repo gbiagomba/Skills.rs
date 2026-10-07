@@ -159,13 +159,39 @@ jobs:
         run: cargo test --all --no-fail-fast
 
       # Uploaded on every successful build so a reviewer can try a PR binary.
+      # The binary must be renamed to its final asset name HERE, not at release
+      # time. The artifact name encodes the platform but the file inside does
+      # not, so `download-artifact` with `merge-multiple` would collapse every
+      # platform's `skill` into one file and the release glob would match
+      # nothing. Renaming per job keeps the six assets distinct.
+      - name: Stage the release asset
+        if: needs.setup.outputs.project_type == 'rust'
+        id: stage
+        shell: bash
+        run: |
+          set -euo pipefail
+          case "${{ runner.os }}-${{ runner.arch }}" in
+            Linux-X64)    ASSET="${BINARY_NAME}-linux-x64" ;;
+            Linux-ARM64)  ASSET="${BINARY_NAME}-linux-aarch64" ;;
+            macOS-X64)    ASSET="${BINARY_NAME}-macos-x64" ;;
+            macOS-ARM64)  ASSET="${BINARY_NAME}-macos-aarch64" ;;
+            Windows-X64)  ASSET="${BINARY_NAME}-windows-x64.exe" ;;
+            Windows-ARM64) ASSET="${BINARY_NAME}-windows-aarch64.exe" ;;
+            *) echo "::error::unmapped runner ${{ runner.os }}-${{ runner.arch }}"; exit 1 ;;
+          esac
+          SRC="target/release/${BINARY_NAME}"
+          [ "${{ runner.os }}" = "Windows" ] && SRC="${SRC}.exe"
+          mkdir -p staged
+          cp "$SRC" "staged/$ASSET"
+          echo "asset=$ASSET" >> "$GITHUB_OUTPUT"
+
       - name: Upload Rust binary artifact
         if: needs.setup.outputs.project_type == 'rust'
         uses: actions/upload-artifact@v7
         with:
-          name: ${{ env.BINARY_NAME }}-${{ runner.os }}-${{ runner.arch }}
-          path: |
-            target/release/${{ env.BINARY_NAME }}*
+          name: ${{ steps.stage.outputs.asset }}
+          path: staged/${{ steps.stage.outputs.asset }}
+          if-no-files-found: error
 
       # PYTHON TOOLCHAIN + CI PATH
       - name: Set up Python
@@ -231,11 +257,17 @@ jobs:
         run: cargo install cross --git https://github.com/cross-rs/cross
       - name: Build (cross)
         run: cross build --release --target aarch64-unknown-linux-gnu
-      - name: Upload binary (linux aarch64)
-        uses: actions/upload-artifact@v7
+      - name: Stage and upload binary (linux-aarch64)
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p staged
+          cp "target/aarch64-unknown-linux-gnu/release/${{ env.BINARY_NAME }}" "staged/${BINARY_NAME}-linux-aarch64"
+      - uses: actions/upload-artifact@v7
         with:
           name: ${{ env.BINARY_NAME }}-linux-aarch64
-          path: target/aarch64-unknown-linux-gnu/release/${{ env.BINARY_NAME }}*
+          path: staged/${{ env.BINARY_NAME }}-linux-aarch64
+          if-no-files-found: error
 
   macos-arm64:
     name: macOS aarch64 (native)
@@ -249,11 +281,17 @@ jobs:
           targets: aarch64-apple-darwin
       - name: Build (macOS aarch64)
         run: cargo build --release --target aarch64-apple-darwin
-      - name: Upload binary (macOS aarch64)
-        uses: actions/upload-artifact@v7
+      - name: Stage and upload binary (macos-aarch64)
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p staged
+          cp "target/aarch64-apple-darwin/release/${{ env.BINARY_NAME }}" "staged/${BINARY_NAME}-macos-aarch64"
+      - uses: actions/upload-artifact@v7
         with:
           name: ${{ env.BINARY_NAME }}-macos-aarch64
-          path: target/aarch64-apple-darwin/release/${{ env.BINARY_NAME }}*
+          path: staged/${{ env.BINARY_NAME }}-macos-aarch64
+          if-no-files-found: error
 
   windows-arm64:
     name: Windows aarch64 (cross)
@@ -267,11 +305,17 @@ jobs:
           targets: aarch64-pc-windows-msvc
       - name: Build (windows aarch64)
         run: cargo build --release --target aarch64-pc-windows-msvc
-      - name: Upload binary (windows aarch64)
-        uses: actions/upload-artifact@v7
+      - name: Stage and upload binary (windows-aarch64.exe)
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p staged
+          cp "target/aarch64-pc-windows-msvc/release/${{ env.BINARY_NAME }}.exe" "staged/${BINARY_NAME}-windows-aarch64.exe"
+      - uses: actions/upload-artifact@v7
         with:
-          name: ${{ env.BINARY_NAME }}-windows-aarch64
-          path: target/aarch64-pc-windows-msvc/release/${{ env.BINARY_NAME }}.exe
+          name: ${{ env.BINARY_NAME }}-windows-aarch64.exe
+          path: staged/${{ env.BINARY_NAME }}-windows-aarch64.exe
+          if-no-files-found: error
 
   release:
     name: Release on tag
@@ -309,13 +353,26 @@ jobs:
           pattern: "*"
           merge-multiple: true
 
+      # An empty release is worse than no release, so this fails rather than
+      # publishing nothing. The first v1.0.0 attempt published zero assets
+      # because the downloaded files were all named `skill`, which is what the
+      # per-job renaming above now prevents.
       - name: Create checksums (Rust binaries only)
         if: needs.setup.outputs.project_type == 'rust'
         shell: bash
         run: |
-          for f in "${BINARY_NAME}"-*; do
+          set -euo pipefail
+          shopt -s nullglob
+          assets=("${BINARY_NAME}"-*)
+          if [ ${#assets[@]} -eq 0 ]; then
+            echo "::error::no release assets were downloaded; refusing to publish an empty release"
+            ls -la
+            exit 1
+          fi
+          for f in "${assets[@]}"; do
             if [ -f "$f" ]; then
               sha256sum "$f" > "$f.sha256"
+              echo "checksummed $f"
             fi
           done
 

@@ -53,6 +53,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   agent that does have an agent-specific directory, since that was only true for
   Codex
 
+### Fixed
+
+- **The release workflow published an empty release.** Each build job uploaded
+  `target/release/skill`, with the platform encoded only in the *artifact name*,
+  so `download-artifact` with `merge-multiple` collapsed all six platforms into a
+  single file called `skill` and the release glob `skill-*` matched nothing. The
+  v1.0.0 release was created with zero assets as a result. Each job now renames
+  its binary to the final asset name (`skill-linux-x64`,
+  `skill-windows-aarch64.exe`, and so on) before uploading, and the release job
+  now **fails** rather than publishing nothing when no assets are found
+
 ### Note on Copilot specifics
 
 - `gh skill` writes provenance metadata into a skill's `SKILL.md` frontmatter and
