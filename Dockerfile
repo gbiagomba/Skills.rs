@@ -48,7 +48,7 @@ RUN apt-get update \
     && rm -rf /var/lib/apt/lists/*
 
 ARG APP_NAME=skill
-ARG APP_VERSION=1.1.0
+ARG APP_VERSION=1.1.1
 ARG APP_MAINTAINER="Gilles Biagomba <gilles.infosec@gmail.com>"
 
 LABEL maintainer="${APP_MAINTAINER}"

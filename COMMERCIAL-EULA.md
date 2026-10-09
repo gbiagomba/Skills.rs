@@ -1,8 +1,8 @@
-# APP_NAME Commercial End User License Agreement
+# `skill` Commercial End User License Agreement
 
 **Last Updated:** [DATE]
 
-This Commercial End User License Agreement (“Agreement”) is a legally binding contract between you (“Licensee,” “you”) and **[YOUR LEGAL NAME / ENTITY]** (“Licensor,” “we,” “us”) governing your use of **APP_NAME**.
+This Commercial End User License Agreement (“Agreement”) is a legally binding contract between you (“Licensee,” “you”) and **Gilles Biagomba** (“Licensor,” “we,” “us”) governing your use of **`skill`**.
 
 BY PURCHASING, DOWNLOADING, INSTALLING, ACCESSING, OR USING THE SOFTWARE UNDER A COMMERCIAL LICENSE, YOU ACKNOWLEDGE THAT YOU HAVE READ, UNDERSTOOD, AND AGREE TO BE BOUND BY THIS AGREEMENT. IF YOU DO NOT AGREE, DO NOT USE THE SOFTWARE.
 
@@ -12,11 +12,11 @@ BY PURCHASING, DOWNLOADING, INSTALLING, ACCESSING, OR USING THE SOFTWARE UNDER A
 
 For purposes of this Agreement:
 
-1.1 **“Software”** means APP_NAME, including all scripts, source code, object code, executables, documentation, configuration files, and related materials provided by Licensor.
+1.1 **“Software”** means `skill`, including all scripts, source code, object code, executables, documentation, configuration files, and related materials provided by Licensor.
 
 1.2 **“Commercial License”** means the license granted under this Agreement as an alternative to the GNU General Public License v3.0.
 
-1.3 **“Open Source Version”** means any version of APP_NAME made available under the GNU General Public License v3.0 (“GPLv3”).
+1.3 **“Open Source Version”** means any version of `skill` made available under the GNU General Public License v3.0 (“GPLv3”).
 
 1.4 **“Organization”** means the single legal entity that purchased the Commercial License.
 
@@ -101,7 +101,7 @@ This is an **internal-use-only license**.
 
 8.1 No rights are granted to use Licensor’s trademarks, trade names, logos, or branding.
 
-8.2 Any use of APP_NAME branding requires prior written consent from Licensor.
+8.2 Any use of `skill` branding requires prior written consent from Licensor.
 
 ---
 

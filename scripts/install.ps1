@@ -11,7 +11,7 @@ $APP_NAME = "skill"
 $REPO = "gbiagomba/Skills.rs"
 $INSTALL_DIR = "$env:ProgramFiles\$APP_NAME"
 
-Write-Host "?? Installing $APP_NAME..." -ForegroundColor Cyan
+Write-Host "==> Installing $APP_NAME..." -ForegroundColor Cyan
 
 # Detect Architecture
 function Get-SystemArchitecture {
@@ -20,7 +20,7 @@ function Get-SystemArchitecture {
         "AMD64" { return "x64" }
         "ARM64" { return "aarch64" }
         default {
-            Write-Host "? Unsupported architecture: $arch" -ForegroundColor Red
+            Write-Host "ERROR: unsupported architecture: $arch" -ForegroundColor Red
             exit 1
         }
     }
@@ -34,7 +34,7 @@ function Test-CommandExists {
 
 # Install dependencies via package managers
 function Install-Dependencies {
-    Write-Host "?? Checking dependencies..." -ForegroundColor Yellow
+    Write-Host "==> Checking dependencies..." -ForegroundColor Yellow
     
     # Try winget first (Windows 10+)
     if (Test-CommandExists winget) {
@@ -52,14 +52,14 @@ function Install-Dependencies {
         scoop install curl
     }
     else {
-        Write-Host "??  No package manager detected. Assuming dependencies are installed." -ForegroundColor Yellow
+        Write-Host "==>  No package manager detected. Assuming dependencies are installed." -ForegroundColor Yellow
     }
 }
 
 # Install via Cargo
 function Install-WithCargo {
     if (Test-CommandExists cargo) {
-        Write-Host "?? Installing via Cargo..." -ForegroundColor Green
+        Write-Host "==> Installing via Cargo..." -ForegroundColor Green
         cargo install --git "https://github.com/$REPO"
         return $true
     }
@@ -68,7 +68,7 @@ function Install-WithCargo {
 
 # Install from GitHub Release
 function Install-FromRelease {
-    Write-Host "?? Downloading from GitHub Releases..." -ForegroundColor Green
+    Write-Host "==> Downloading from GitHub Releases..." -ForegroundColor Green
     
     $arch = Get-SystemArchitecture
     $BINARY = "$APP_NAME-windows-$arch.exe"
@@ -80,7 +80,7 @@ function Install-FromRelease {
         Write-Host "Latest version: $LATEST" -ForegroundColor Cyan
     }
     catch {
-        Write-Host "? Failed to fetch latest release version" -ForegroundColor Red
+        Write-Host "Failed to fetch latest release version" -ForegroundColor Red
         exit 1
     }
     
@@ -93,7 +93,7 @@ function Install-FromRelease {
         Invoke-WebRequest -Uri $URL -OutFile $tempFile -UseBasicParsing
     }
     catch {
-        Write-Host "? Failed to download binary" -ForegroundColor Red
+        Write-Host "Failed to download binary" -ForegroundColor Red
         exit 1
     }
     
@@ -106,7 +106,7 @@ function Install-FromRelease {
     $finalPath = "$INSTALL_DIR\$APP_NAME.exe"
     Move-Item -Path $tempFile -Destination $finalPath -Force
     
-    Write-Host "? Binary installed to: $finalPath" -ForegroundColor Green
+    Write-Host "Binary installed to: $finalPath" -ForegroundColor Green
     
     # Add to PATH if not already there
     $currentPath = [Environment]::GetEnvironmentVariable("Path", "Machine")
@@ -117,7 +117,7 @@ function Install-FromRelease {
             "$currentPath;$INSTALL_DIR",
             "Machine"
         )
-        Write-Host "? Added to PATH. Please restart your terminal." -ForegroundColor Green
+        Write-Host "Added to PATH. Please restart your terminal." -ForegroundColor Green
     }
 }
 
@@ -127,7 +127,7 @@ function Main {
     $isAdmin = ([Security.Principal.WindowsPrincipal] [Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)
     
     if (-not $isAdmin) {
-        Write-Host "??  This script requires Administrator privileges." -ForegroundColor Yellow
+        Write-Host "==>  This script requires Administrator privileges." -ForegroundColor Yellow
         Write-Host "Please run PowerShell as Administrator and try again." -ForegroundColor Yellow
         exit 1
     }
@@ -152,7 +152,7 @@ function Main {
     switch ($choice) {
         "1" {
             if (-not (Install-WithCargo)) {
-                Write-Host "? Cargo not found. Please install Rust first: https://rustup.rs/" -ForegroundColor Red
+                Write-Host "Cargo not found. Please install Rust first: https://rustup.rs/" -ForegroundColor Red
                 exit 1
             }
         }
@@ -161,18 +161,18 @@ function Main {
         }
         "3" {
             if (-not (Install-WithCargo)) {
-                Write-Host "??  Cargo not found, falling back to binary installation" -ForegroundColor Yellow
+                Write-Host "==>  Cargo not found, falling back to binary installation" -ForegroundColor Yellow
                 Install-FromRelease
             }
         }
         default {
-            Write-Host "? Invalid choice" -ForegroundColor Red
+            Write-Host "Invalid choice" -ForegroundColor Red
             exit 1
         }
     }
     
     Write-Host ""
-    Write-Host "? $APP_NAME installed successfully!" -ForegroundColor Green
+    Write-Host "OK: $APP_NAME installed successfully." -ForegroundColor Green
     Write-Host ""
     Write-Host "Run: $APP_NAME --help" -ForegroundColor Cyan
 }

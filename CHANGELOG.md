@@ -9,6 +9,41 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 > earlier history belonged to the project **template** this repository was created
 > from, not to `skill`. The 1.0.0 entry below is `skill`'s own first version.
 
+## [1.1.1] - 2026-10-09
+
+### Fixed
+
+- **Leftover template placeholders in the legal files.** `TRADEMARK_POLICY.md`,
+  `COMMERCIAL-EULA.md`, and `COMMERCIAL_LICENSE.md` still referred to the product
+  as `APP_NAME` or `App_Name`. A trademark policy that never names the mark is
+  not much of a policy. The product name is now set in backticks throughout, so
+  `skill` is unambiguous against the ordinary English word, which matters most in
+  exactly these documents
+- **`COMMERCIAL_LICENSE.md` still named `Sherlock`**, branding inherited from an
+  unrelated project. An earlier changelog entry claimed that branding had been
+  removed, but only `TRADEMARK_POLICY.md` had been cleaned
+- **`COMMERCIAL-EULA.md` had an unfilled `[YOUR LEGAL NAME / ENTITY]` licensor
+  field**, which would have made the agreement unenforceable. Set to
+  `Gilles Biagomba`, matching the `Cargo.toml` author and the "project author and
+  maintainer" language already in `TRADEMARK_POLICY.md`
+- **Mangled emoji in all three install scripts.** Every status marker had been
+  corrupted to `?` or `??`, so the installers printed lines like
+  `? Unsupported OS` and `?? Installing`. Replaced with ASCII markers (`==>`,
+  `OK:`, `WARNING:`, `ERROR:`) rather than restoring emoji: these already failed
+  to survive once, and Windows `cmd` codepages mangle them again
+- `.github/FUNDING.yml` carried GitHub's boilerplate "Replace with a single ..."
+  comments on nine unused platforms. Reduced to the two actually configured
+
+### Verified
+
+- The published `v1.1.0` release assets are correct end to end: replaying
+  `install.sh`'s own platform detection and URL construction resolved `v1.1.0`,
+  computed `skill-macos-aarch64`, downloaded it, and ran it. The SHA-256 file
+  verifies with `shasum -a 256 -c`
+- The install scripts' architecture mapping matches the released asset names
+  exactly (`linux-x64`, `linux-aarch64`, `macos-x64`, `macos-aarch64`,
+  `windows-x64.exe`, `windows-aarch64.exe`)
+
 ## [Unreleased]
 
 ### Fixed

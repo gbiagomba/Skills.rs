@@ -1,6 +1,6 @@
-# App_Name Commercial Licensing
+# `skill` Commercial Licensing
 
-App_Name is released under the GNU General Public License v3.0 (GPLv3) and is free to use, modify, and distribute under the terms of that license.
+`skill` is released under the GNU General Public License v3.0 (GPLv3) and is free to use, modify, and distribute under the terms of that license.
 
 For organizations that require additional rights or assurances beyond GPLv3, commercial licensing options are available.
 
@@ -8,10 +8,10 @@ For organizations that require additional rights or assurances beyond GPLv3, com
 
 You may require a commercial license if you wish to:
 
-- Use App_Name branding, name, or logos in marketing or service offerings
-- Offer App_Name-based services under your company’s brand
+- Use `skill` branding, name, or logos in marketing or service offerings
+- Offer `skill`-based services under your company’s brand
 - Create proprietary or closed-source derivatives
-- Embed Sherlock into internal or commercial tooling without GPL obligations
+- Embed `skill` into internal or commercial tooling without GPL obligations
 - Receive warranties, indemnification, or support SLAs
 - Access private features, integrations, or roadmap influence
 
@@ -29,4 +29,4 @@ Commercial licenses may include:
 
 To discuss commercial licensing options, please contact:
 
-📧 **[gilles.infosec@gmail.com]**
+📧 **gilles.infosec@gmail.com**

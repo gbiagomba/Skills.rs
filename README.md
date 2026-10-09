@@ -1,6 +1,6 @@
 # skill
 
-> VERSION: 1.1.0
+> VERSION: 1.1.1
 > DESCRIPTION: A cross-agent skill manager with safe copying, linking, migration, updates, and synchronization.
 > AUTHOR: Gilles Biagomba
 > LICENSE: GPL-3.0-only (dual-licensed, see [License](#-license))

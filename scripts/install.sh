@@ -8,7 +8,7 @@ APP_NAME="skill"
 REPO="gbiagomba/Skills.rs"
 INSTALL_DIR="/usr/local/bin"
 
-echo "?? Installing ${APP_NAME}..."
+echo "==> Installing ${APP_NAME}..."
 
 # Color output
 RED='\033[0;31m'
@@ -22,7 +22,7 @@ detect_os() {
         Linux*)   OS=linux ;;
         Darwin*)  OS=macos ;;
         *) 
-            echo -e "${RED}? Unsupported OS: $(uname -s)${NC}"
+            echo -e "${RED}ERROR: unsupported OS: $(uname -s)${NC}"
             exit 1 
             ;;
     esac
@@ -34,7 +34,7 @@ detect_arch() {
         x86_64|amd64) ARCH=x64 ;;
         aarch64|arm64) ARCH=aarch64 ;;
         *) 
-            echo -e "${RED}? Unsupported architecture: $(uname -m)${NC}"
+            echo -e "${RED}ERROR: unsupported architecture: $(uname -m)${NC}"
             exit 1 
             ;;
     esac
@@ -47,7 +47,7 @@ command_exists() {
 
 # Install dependencies based on distribution
 install_dependencies() {
-    echo -e "${YELLOW}?? Checking dependencies...${NC}"
+    echo -e "${YELLOW}==> Checking dependencies...${NC}"
     
     # Detect package manager and install dependencies
     if command_exists apt-get; then
@@ -80,14 +80,14 @@ install_dependencies() {
         echo "Detected: macOS (Homebrew)"
         brew install curl
     else
-        echo -e "${YELLOW}??  Could not detect package manager. Assuming dependencies are installed.${NC}"
+        echo -e "${YELLOW}WARNING: could not detect a package manager. Assuming dependencies are installed.${NC}"
     fi
 }
 
 # Install via Cargo (preferred method)
 install_with_cargo() {
     if command_exists cargo; then
-        echo -e "${GREEN}?? Installing via Cargo...${NC}"
+        echo -e "${GREEN}==> Installing via Cargo...${NC}"
         cargo install --git "https://github.com/${REPO}"
         return 0
     fi
@@ -96,7 +96,7 @@ install_with_cargo() {
 
 # Install from GitHub Release (fallback)
 install_from_release() {
-    echo -e "${GREEN}?? Downloading from GitHub Releases...${NC}"
+    echo -e "${GREEN}==> Downloading from GitHub Releases...${NC}"
     
     detect_os
     detect_arch
@@ -107,7 +107,7 @@ install_from_release() {
     LATEST=$(curl -s "https://api.github.com/repos/${REPO}/releases/latest" | grep '"tag_name":' | sed -E 's/.*"([^"]+)".*/\1/')
     
     if [ -z "$LATEST" ]; then
-        echo -e "${RED}? Failed to fetch latest release version${NC}"
+        echo -e "${RED}ERROR: failed to fetch the latest release version${NC}"
         exit 1
     fi
     
@@ -118,7 +118,7 @@ install_from_release() {
     
     # Download binary
     if ! curl -L -f "$URL" -o "$APP_NAME"; then
-        echo -e "${RED}? Failed to download binary${NC}"
+        echo -e "${RED}ERROR: failed to download the binary${NC}"
         exit 1
     fi
     
@@ -129,11 +129,11 @@ install_from_release() {
     if [ -w "$INSTALL_DIR" ]; then
         mv "$APP_NAME" "${INSTALL_DIR}/${APP_NAME}"
     else
-        echo -e "${YELLOW}??  Need sudo to install to ${INSTALL_DIR}${NC}"
+        echo -e "${YELLOW}==> Need sudo to install to ${INSTALL_DIR}${NC}"
         sudo mv "$APP_NAME" "${INSTALL_DIR}/${APP_NAME}"
     fi
     
-    echo -e "${GREEN}? Binary installed to: ${INSTALL_DIR}/${APP_NAME}${NC}"
+    echo -e "${GREEN}OK: binary installed to ${INSTALL_DIR}/${APP_NAME}${NC}"
 }
 
 # Main installation logic
@@ -152,7 +152,7 @@ main() {
     case $choice in
         1)
             if ! install_with_cargo; then
-                echo -e "${RED}? Cargo not found. Please install Rust first: https://rustup.rs/${NC}"
+                echo -e "${RED}Cargo not found. Please install Rust first: https://rustup.rs/${NC}"
                 exit 1
             fi
             ;;
@@ -161,18 +161,18 @@ main() {
             ;;
         3)
             if ! install_with_cargo; then
-                echo -e "${YELLOW}??  Cargo not found, falling back to binary installation${NC}"
+                echo -e "${YELLOW}WARNING: cargo not found, falling back to binary installation${NC}"
                 install_from_release
             fi
             ;;
         *)
-            echo -e "${RED}? Invalid choice${NC}"
+            echo -e "${RED}Invalid choice${NC}"
             exit 1
             ;;
     esac
     
     echo ""
-    echo -e "${GREEN}? ${APP_NAME} installed successfully!${NC}"
+    echo -e "${GREEN}OK: ${APP_NAME} installed successfully.${NC}"
     echo ""
     echo "Run: ${APP_NAME} --help"
 }
