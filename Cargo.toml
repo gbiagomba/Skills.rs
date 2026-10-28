@@ -49,7 +49,7 @@ tracing-subscriber = "0.3.23"
 ureq = { version = "3.4.2", features = ["rustls"] }
 url = "2.5.8"
 walkdir = "2.5.0"
-zip = "7.2.0"
+zip = "9.1.0"
 
 [features]
 default = ["smb"]
