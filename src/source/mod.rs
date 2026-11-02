@@ -8,6 +8,11 @@
 //!
 //! Each backend reports its [`Capabilities`] so callers can tell a transport that
 //! supports revision checks from one that does not, rather than inferring it.
+//!
+//! Only the filesystem backend is implemented. The Git, HTTP(S), and SMB
+//! backends fail by name with [`crate::ExitCode::NotImplemented`]. Their
+//! dependencies are deliberately **not** declared until the code exists; see
+//! [`PLANNED_BACKEND_CRATES`].
 
 pub mod fs;
 pub mod locator;
@@ -102,26 +107,18 @@ pub trait Backend: std::fmt::Debug {
 
 /// Pick the backend for a locator.
 ///
-/// A transport whose feature is not compiled in fails with the feature name
-/// rather than a generic error, so the fix is obvious.
+/// A transport that is not implemented in this build fails by name rather than
+/// generically, so the fix is obvious.
 pub fn backend_for(locator: &locator::Locator) -> Result<Box<dyn Backend>> {
     match locator.source_type {
         SourceType::Filesystem => Ok(Box::new(fs::FilesystemBackend)),
         SourceType::Git => Err(not_yet("git", "git")),
         SourceType::Http => Err(not_yet("http", "http")),
-        SourceType::Smb => {
-            #[cfg(feature = "smb")]
-            {
-                Err(not_yet("smb", "smb"))
-            }
-            #[cfg(not(feature = "smb"))]
-            {
-                Err(crate::Error::BackendUnavailable {
-                    transport: "SMB".to_string(),
-                    feature: "smb".to_string(),
-                })
-            }
-        }
+        // There is no `smb` cargo feature any more. It gated a backend that was
+        // never written, so it enabled nothing while pulling an async runtime
+        // into every default build. The crate selected for the work when it
+        // lands is still recorded in docs/compatibility.md.
+        SourceType::Smb => Err(not_yet("smb", "smb")),
         SourceType::Bundle | SourceType::Adopted => Err(crate::Error::UnsupportedSource {
             locator: locator.sanitized.clone(),
             reason: "this source type is restored by `skill import`, not acquired directly".into(),
@@ -141,6 +138,18 @@ fn not_yet(transport: &str, _feature: &str) -> crate::Error {
         ),
     }
 }
+
+/// The dependency a transport will need once it is implemented.
+///
+/// Recorded here so the choice is not lost now that the crates are no longer
+/// declared. Each was removed because nothing referenced it, and together they
+/// carried 18 advisories, including a critical one in `zip`.
+pub const PLANNED_BACKEND_CRATES: [(&str, &str); 4] = [
+    ("git", "gix"),
+    ("http", "ureq, plus tar/flate2/zip for archives"),
+    ("smb", "smb2"),
+    ("bundle", "tar and flate2"),
+];
 
 /// Copy a tree into a staging directory, applying every containment rule.
 ///

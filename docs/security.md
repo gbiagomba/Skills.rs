@@ -112,8 +112,14 @@ Each of those needs its own specific decision.
 
 - The state database, transaction journals, and backups are created mode 0600,
   and their directories 0700. They record source locators and file inventories.
-- Structured logs are redacted. Full skill content and secrets are not logged by
-  default.
+- **There is no logging subsystem, and this build emits no log file.** An earlier
+  version of this document described "structured logs with redaction"; that
+  described a module that was never written, and the `tracing` dependency it
+  would have used has been removed. What exists today is deliberate and narrow:
+  human-readable diagnostics on stderr, the append-only transaction journal
+  (which records paths and digests, never file contents), and the state
+  database. Nothing else is written. When logging is added it must redact by
+  default, and `docs/checklist.md` tracks that as pending rather than done.
 - **There is no telemetry.** `skill` makes no network call that the operator did
   not ask for.
 - Imported manifests are untrusted. `skill` does not obey an embedded absolute
@@ -143,9 +149,11 @@ Each of those needs its own specific decision.
   implemented and unit tested, and CI builds on Windows, but the adversarial path
   tests have been executed on macOS only in this working session.
 - **Native SMB is not implemented in this build.** `smb://` parsing and the
-  backend seam exist; acquisition returns exit code 12. Mounted shares work today
-  through the filesystem backend, and that is deliberately labelled mounted-path
-  support rather than native SMB.
+  backend seam exist; acquisition returns exit code 12. The `smb2` crate selected
+  for the work is **not declared as a dependency** until that code exists, and
+  the `smb` cargo feature has been removed because it gated nothing. Mounted
+  shares work today through the filesystem backend, and that is deliberately
+  labelled mounted-path support rather than native SMB.
 - A fully concurrent attacker with write access to a destination's **parent**
   directory can still win a race in principle. We narrow the window by
   re-verifying containment and fingerprints immediately before mutation, but

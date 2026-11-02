@@ -1,6 +1,6 @@
 # skill
 
-> VERSION: 1.1.1
+> VERSION: 1.2.0
 > DESCRIPTION: A cross-agent skill manager with safe copying, linking, migration, updates, and synchronization.
 > AUTHOR: Gilles Biagomba
 > LICENSE: GPL-3.0-only (dual-licensed, see [License](#-license))
@@ -142,8 +142,10 @@ cargo build --release --locked
 # Binary at target/release/skill
 ```
 
-No system libraries are needed. SQLite is compiled in, and the Git and SMB
-backends are pure Rust.
+No system libraries are needed: SQLite is compiled in. The dependency graph is
+deliberately small (120 crates), because the crates for the unimplemented Git,
+HTTP(S), and SMB backends are not declared until that code exists. See
+[`docs/checklist.md`](docs/checklist.md).
 
 ### Using Install Scripts
 
@@ -422,9 +424,7 @@ The full gate, which is what CI runs:
 make ci
 # cargo fmt --all -- --check
 # cargo clippy --all-targets --all-features -- -D warnings
-# cargo clippy --all-targets --no-default-features -- -D warnings
 # cargo test --locked --all-features
-# cargo test --locked --no-default-features
 # cargo build --release
 make msrv     # cargo +1.88 check --locked --all-targets
 ```

@@ -1,4 +1,11 @@
 # .github/dependabot.yml
+#
+# `skill` declares a minimum supported Rust version (see `rust-version` in
+# Cargo.toml) and verifies it in CI. A dependency release that raises its own
+# MSRV above ours cannot be merged without raising ours too, which is a
+# user-visible compatibility change rather than a routine bump. Those are
+# ignored here by major version so they do not reopen every week; drop the
+# ignore when the MSRV is deliberately raised.
 
 version: 2
 updates:
@@ -7,16 +14,20 @@ updates:
     schedule:
       interval: "weekly"
     open-pull-requests-limit: 10
+    groups:
+      # Patch bumps are reviewed as one pull request rather than one each.
+      cargo-patch:
+        patterns:
+          - "*"
+        update-types:
+          - "patch"
+    ignore:
+      # rusqlite 0.41 requires rustc 1.89; our declared MSRV is 1.88.
+      - dependency-name: "rusqlite"
+        versions: [">= 0.41.0"]
 
   - package-ecosystem: "github-actions"
     directory: "/"
     schedule:
       interval: "weekly"
     open-pull-requests-limit: 10
-
-  # Optional: enable for Python projects
-  # - package-ecosystem: "pip"
-  #   directory: "/"
-  #   schedule:
-  #     interval: "weekly"
-  #   open-pull-requests-limit: 10

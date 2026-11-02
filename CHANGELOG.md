@@ -44,6 +44,57 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   exactly (`linux-x64`, `linux-aarch64`, `macos-x64`, `macos-aarch64`,
   `windows-x64.exe`, `windows-aarch64.exe`)
 
+## [1.2.0] - 2026-11-02
+
+### Security
+
+- **Removed ten declared dependencies that no code referenced**, which took
+  `cargo audit` from **15 vulnerabilities to 0** and the dependency graph from
+  **320 crates to 120**. The crates were `gix`, `ureq`, `tar`, `flate2`, `zip`,
+  `tracing`, `tracing-subscriber`, `camino`, `indexmap`, and `smb2`, all declared
+  up front for backends and a logging module that were then not implemented
+- Eighteen of the nineteen advisories lived in those unused subtrees, including
+  [RUSTSEC-2026-0369](https://rustsec.org/advisories/RUSTSEC-2026-0369) (9.1
+  critical) and two highs in `zip`: symlink escape outside the destination,
+  SUID/SGID preservation, and applying permissions through symlinks during
+  extraction. That is precisely the attack class `src/safepath.rs` exists to
+  prevent, so the project was shipping a vulnerable implementation of its own
+  threat model that nothing called
+- An async runtime (tokio) is no longer pulled into the default build
+- **CI now fails on any advisory** (`cargo audit --deny warnings`) and reports
+  unused dependencies, so neither problem can accumulate silently again
+
+### Changed
+
+- **The `smb` cargo feature has been removed.** It gated a backend that was
+  never implemented, so it enabled nothing while pulling tokio and two
+  advisories into every default build. `smb2` remains the crate selected for
+  that work and the choice stays recorded in `docs/compatibility.md`; only the
+  declaration is gone. `smb://` acquisition still fails by name with exit 12
+- `serde_json` 1.0.151 to 1.0.154, `sha2` 0.11.0 to 0.11.1, `similar` 3.2.0 to
+  3.2.1, all verified against MSRV 1.88
+- Dependabot now groups patch bumps into one pull request, and ignores
+  `rusqlite` 0.41 and above, which requires rustc 1.89 against our declared MSRV
+  of 1.88. Raising the MSRV is a user-visible compatibility change, not a routine
+  bump, so it is a deliberate decision rather than a merge
+
+### Fixed
+
+- **`docs/security.md` claimed "structured logs are redacted".** No logging
+  subsystem was ever written, and the `tracing` dependency it would have used is
+  now removed. The document now states plainly that this build emits no log file,
+  and `docs/checklist.md` records redacted logging as pending rather than done
+
+### Known remaining advisory
+
+- [RUSTSEC-2024-0449](https://rustsec.org/advisories/RUSTSEC-2024-0449):
+  `unsafe-libyaml` is unmaintained, reached through `serde_yaml_ng`. A
+  maintenance risk, not a known exploit. `serde_yaml_ng` 0.10.0 is the newest
+  release, so no upgrade clears it. Swapping to `saphyr` or `yaml-rust2` is
+  feasible (two call sites, `Value` tree only, no serde derive) but frontmatter
+  parsing is a trust boundary, so it is deferred to its own change with its own
+  test pass rather than bundled here
+
 ## [Unreleased]
 
 ### Fixed

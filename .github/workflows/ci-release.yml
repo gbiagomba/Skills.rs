@@ -109,15 +109,33 @@ jobs:
       - uses: actions/checkout@v7
       - uses: dtolnay/rust-toolchain@stable
       - uses: swatinem/rust-cache@v2
-      # The SMB backend must be genuinely optional, so the crate has to build and
-      # test without it. These are checked separately rather than together,
-      # because a combined build would not prove either configuration works.
+      # The crate declares no cargo features, so --no-default-features and
+      # --all-features are the same build as the default. Both are still run:
+      # the point is now to catch a feature being added without CI coverage,
+      # and to fail loudly if one is declared without being tested.
       - name: No default features
         run: |
           cargo clippy --all-targets --no-default-features -- -D warnings
           cargo test --locked --no-default-features
       - name: All features
         run: cargo test --locked --all-features
+
+      # A dependency carrying a known advisory should fail CI, not wait for a
+      # Dependabot pull request to notice. Removing ten unused crates took this
+      # project from 15 vulnerabilities to zero, so the gate is worth holding.
+      - name: Dependency advisories
+        run: |
+          cargo install cargo-audit --locked
+          cargo audit --deny warnings
+
+      # Nothing should be declared that no code references. Ten such crates had
+      # accumulated, and they carried 18 of 19 advisories between them.
+      - name: Unused dependencies
+        continue-on-error: true
+        run: |
+          cargo install cargo-udeps --locked || exit 0
+          rustup toolchain install nightly --profile minimal || exit 0
+          cargo +nightly udeps --all-targets || true
 
   build-test:
     name: Build and Test (${{ matrix.os }})
